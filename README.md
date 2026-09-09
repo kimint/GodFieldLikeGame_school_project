@@ -1,44 +1,46 @@
 # GodFieldLikeGame_school_project
 
-웹 게임 [Godfield](https://godfield.net/) 를 베이스로 한 카드 배틀 게임의 첫 프로토타입입니다.
-일러스트 없이 **공격 카드**와 **수비 카드**만 있고, 손패에서 카드를 골라 CPU와 대결합니다.
+A first prototype of a card battle game based on the browser game [Godfield](https://godfield.net/).
+There is no art — only **attack cards** and **defense cards** with a number on them. You pick a card
+from your hand and use it against the CPU.
 
-## 실행 방법
+## Running it
 
-빌드 도구가 필요 없습니다. `index.html` 파일을 브라우저로 열면 됩니다.
+No build step required. Open `index.html` in a browser.
 
-또는 로컬 서버로 실행:
+Or serve it locally (requires Python):
 
 ```bash
 python -m http.server 8000
 ```
 
-그 다음 브라우저에서 `http://localhost:8000` 접속.
+Then open `http://localhost:8000` in a browser.
 
-## 규칙
+## Rules
 
-- 두 플레이어(플레이어 vs CPU)는 HP 40으로 시작하고, 손패 5장을 가진다.
-- 자기 턴에 손패에서 카드 한 장을 골라 사용한다.
-  - **공격 카드 (수치 N)**: 상대의 수비 수치가 먼저 N만큼 피해를 막고, 남은 만큼 상대 HP가 깎인다.
-  - **수비 카드 (수치 N)**: 내 수비 수치를 N만큼 올린다. 다음에 들어오는 공격을 막는 데 쓰인다.
-- 카드를 쓰면 손패를 다시 5장으로 채운다.
-- 덱을 다 쓰면 사용한 카드를 섞어 다시 사용한다.
-- 상대 HP가 0이 되면 승리.
+- Both fighters (Player vs CPU) start at 40 HP with a hand of 5 cards.
+- On your turn, pick one card from your hand and use it.
+  - **Attack card (value N)**: the opponent's shield absorbs up to N damage first, and the rest
+    comes off the opponent's HP.
+  - **Defense card (value N)**: raises your own shield by N. It is spent absorbing the next attack.
+- After a card is used, the hand is refilled back to 5.
+- When the draw pile runs out, the discard pile is shuffled and reused.
+- Reduce the opponent's HP to 0 to win.
 
-## 파일 구조
+## File layout
 
-| 파일 | 역할 |
+| File | Purpose |
 | --- | --- |
-| `index.html` | 화면 뼈대 |
-| `src/style.css` | 스타일 |
-| `src/cards.js` | 카드 종류 정의와 덱 생성 |
-| `src/game.js` | 게임 상태와 규칙 (화면과 분리된 순수 로직) |
-| `src/ui.js` | 화면 렌더링과 클릭 처리 |
+| `index.html` | Page skeleton |
+| `src/style.css` | Styling |
+| `src/cards.js` | Card type definitions and deck creation |
+| `src/game.js` | Game state and rules (pure logic, no DOM) |
+| `src/ui.js` | Rendering and click handling |
 
-## 다음에 해볼 만한 것
+## Ideas for next steps
 
-- 2인 핫시트 또는 온라인 대전
-- 카드 종류 추가 (회복, 반사, 상태이상 등 Godfield 아이템 요소)
-- 손패를 매 턴 1장씩만 뽑도록 바꿔 자원 관리 요소 넣기
-- 애니메이션 / 효과음
-- 규칙 로직에 대한 테스트 코드 추가
+- Two-player hotseat, or online multiplayer
+- More card types (healing, reflect, status effects, and other Godfield-style items)
+- Draw only 1 card per turn to add a resource-management element
+- Animations / sound effects
+- Tests for the rules logic
