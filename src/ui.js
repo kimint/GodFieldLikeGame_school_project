@@ -1,8 +1,8 @@
-// 화면 렌더링과 사용자 입력 처리
+// Rendering and user input handling
 
 let game = createGame();
 
-// 자주 쓰는 DOM 요소 모음
+// Frequently used DOM elements
 const el = {
   playerHp: document.getElementById("player-hp"),
   playerShield: document.getElementById("player-shield"),
@@ -14,14 +14,14 @@ const el = {
   restart: document.getElementById("restart"),
 };
 
-// 게임 상태를 화면에 반영한다
+// Render the current game state to the screen
 function render() {
   el.playerHp.textContent = game.player.hp;
   el.playerShield.textContent = game.player.shield;
   el.cpuHp.textContent = game.cpu.hp;
   el.cpuShield.textContent = game.cpu.shield;
 
-  // 손패를 카드 버튼으로 그린다
+  // Draw the hand as card buttons
   el.hand.innerHTML = "";
   for (const card of game.player.hand) {
     const button = document.createElement("button");
@@ -30,7 +30,7 @@ function render() {
 
     const type = document.createElement("span");
     type.className = "card__type";
-    type.textContent = card.type === CARD_TYPE.ATTACK ? "공격" : "수비";
+    type.textContent = card.type === CARD_TYPE.ATTACK ? "Attack" : "Defense";
 
     const value = document.createElement("span");
     value.className = "card__value";
@@ -41,7 +41,7 @@ function render() {
     el.hand.appendChild(button);
   }
 
-  // 진행 기록 (최근 12줄)
+  // Battle log (latest 12 lines)
   el.log.innerHTML = "";
   for (const line of game.log.slice(0, 12)) {
     const li = document.createElement("li");
@@ -49,15 +49,15 @@ function render() {
     el.log.appendChild(li);
   }
 
-  // 턴 안내
+  // Turn indicator
   if (game.winner) {
-    el.turn.textContent = `${game.winner.name} 승리! "다시 시작"을 눌러 주세요.`;
+    el.turn.textContent = `${game.winner.name} wins! Press "Restart" to play again.`;
   } else {
-    el.turn.textContent = game.turn === "player" ? "당신의 턴" : "CPU 턴...";
+    el.turn.textContent = game.turn === "player" ? "Your turn" : "CPU's turn...";
   }
 }
 
-// 플레이어가 카드를 클릭했을 때
+// Called when the player clicks a card
 function onCardClick(cardId) {
   if (game.turn !== "player" || game.winner) return;
 
@@ -65,7 +65,7 @@ function onCardClick(cardId) {
   render();
   if (game.winner) return;
 
-  // 연출을 위해 잠시 뒤 CPU가 행동한다
+  // Let the CPU act after a short delay for pacing
   setTimeout(() => {
     cpuPlay(game);
     render();
