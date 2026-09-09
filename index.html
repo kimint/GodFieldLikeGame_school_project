@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Godfield-lite</title>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <main class="app">
+    <h1>Godfield-lite</h1>
+    <p class="subtitle">공격 카드와 수비 카드를 골라 CPU와 대결합니다.</p>
+
+    <section class="board">
+      <div class="fighter">
+        <h2>CPU</h2>
+        <p>HP <span id="cpu-hp">40</span></p>
+        <p>수비 <span id="cpu-shield">0</span></p>
+      </div>
+      <div class="fighter">
+        <h2>플레이어</h2>
+        <p>HP <span id="player-hp">40</span></p>
+        <p>수비 <span id="player-shield">0</span></p>
+      </div>
+    </section>
+
+    <p id="turn" class="turn"></p>
+
+    <section>
+      <h2>내 손패</h2>
+      <div id="hand" class="hand"></div>
+    </section>
+
+    <button id="restart" class="restart">다시 시작</button>
+
+    <section>
+      <h2>진행 기록</h2>
+      <ul id="log" class="log"></ul>
+    </section>
+  </main>
+
+  <!-- 빌드 도구 없이 순서대로 로드 (cards -> game -> ui) -->
+  <script src="src/cards.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/ui.js"></script>
+</body>
+</html>
