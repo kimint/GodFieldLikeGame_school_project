@@ -17,8 +17,10 @@
     <h1>Data Model Smoke Test</h1>
     <p class="subtitle">
       Standalone check for the class / synergy / card data model in
-      <code>src/model/</code> (see docs/DESIGN.md). Not wired into the
-      playable game yet -- see <code>index.html</code> for that.
+      <code>src/model/</code> (see docs/DESIGN.md), independent of any UI.
+      For the actual playable game built on this model, see
+      <code>index.html</code>; <code>src/model/engine.js</code> is the turn
+      loop that wires the two together.
     </p>
     <p id="summary"></p>
     <ul id="results"></ul>

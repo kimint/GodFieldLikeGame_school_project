@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Godfield-lite</title>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <main class="app">
+    <h1>Godfield-lite</h1>
+    <p class="subtitle">Pick an attack or defense card and battle the CPU.</p>
+
+    <section class="board">
+      <div class="fighter">
+        <h2>CPU</h2>
+        <p>HP <span id="cpu-hp">40</span></p>
+        <p>Shield <span id="cpu-shield">0</span></p>
+      </div>
+      <div class="fighter">
+        <h2>Player</h2>
+        <p>HP <span id="player-hp">40</span></p>
+        <p>Shield <span id="player-shield">0</span></p>
+      </div>
+    </section>
+
+    <p id="turn" class="turn"></p>
+
+    <section>
+      <h2>Your hand</h2>
+      <div id="hand" class="hand"></div>
+    </section>
+
+    <button id="restart" class="restart">Restart</button>
+
+    <section>
+      <h2>Battle log</h2>
+      <ul id="log" class="log"></ul>
+    </section>
+  </main>
+
+  <!-- Loaded in order without a build step (cards -> game -> ui) -->
+  <script src="src/cards.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/ui.js"></script>
+</body>
+</html>

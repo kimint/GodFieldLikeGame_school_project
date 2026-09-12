@@ -2,10 +2,15 @@
 // Names, numbers, and flavor here are placeholders for wiring the pieces
 // together -- not final game design.
 
+// `countsCategory` tells the engine (src/model/engine.js) which card category
+// played this match counts toward a synergy's tier -- it isn't read by
+// src/model/synergies.js itself, which just takes whatever counts the caller
+// hands it.
 const exampleSynergyBulwark = createSynergy({
   id: "bulwark",
   name: "Bulwark (example)",
   description: "Placeholder synergy: rewards playing defend cards.",
+  countsCategory: CARD_CATEGORY.DEFEND,
   tiers: [
     { count: 2, effects: [statModifier("def", MODIFIER_MODE.FLAT, 5)] },
     { count: 4, effects: [statModifier("def", MODIFIER_MODE.FLAT, 12)] },
@@ -15,13 +20,43 @@ const exampleSynergyBulwark = createSynergy({
 const exampleClassGuardian = createClass({
   id: "guardian",
   name: "Guardian (example)",
-  baseStats: { hp: 40, def: 5, mr: 2, er: 2, ur: 1 },
+  baseStats: { hp: 44, def: 6, mr: 2, er: 2, ur: 6, crit: 0 },
   synergyPool: [exampleSynergyBulwark],
   ultimate: createUltimate({
     id: "guardian_ultimate",
     name: "TBD",
     description: "Placeholder -- ultimate name/theme is still an open question.",
-    cost: 100,
+    cost: 24,
+    damage: 14,
+  }),
+  passives: [],
+});
+
+// A second example class so the class system actually shows a contrast:
+// squishier, faster ultimate charge, leans on element attacks instead of
+// physical + defend.
+const exampleSynergyKindling = createSynergy({
+  id: "kindling",
+  name: "Kindling (example)",
+  description: "Placeholder synergy: aggression (attack cards) fuels ultimate charge.",
+  countsCategory: CARD_CATEGORY.ATTACK,
+  tiers: [
+    { count: 2, effects: [statModifier("ur", MODIFIER_MODE.FLAT, 2)] },
+    { count: 4, effects: [statModifier("ur", MODIFIER_MODE.FLAT, 5)] },
+  ],
+});
+
+const exampleClassPyromancer = createClass({
+  id: "pyromancer",
+  name: "Pyromancer (example)",
+  baseStats: { hp: 34, def: 2, mr: 3, er: 4, ur: 8, crit: 0 },
+  synergyPool: [exampleSynergyKindling],
+  ultimate: createUltimate({
+    id: "pyromancer_ultimate",
+    name: "TBD",
+    description: "Placeholder -- ultimate name/theme is still an open question.",
+    cost: 20,
+    damage: 18,
   }),
   passives: [],
 });
