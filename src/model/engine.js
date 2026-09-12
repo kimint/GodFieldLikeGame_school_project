@@ -1,13 +1,18 @@
-// Turn-based battle engine wiring the class/card/synergy model above into an
-// actual playable loop, used by index.html. See docs/DESIGN.md for the design
-// this is built from, and README.md for how this differs from the original
-// simple prototype kept under legacy/.
+// Battle engine wiring the class/card/synergy model above into an actual
+// playable loop, used by index.html. See docs/DESIGN.md for the design this
+// is built from, and README.md for how this differs from the original simple
+// prototype kept under legacy/.
 //
-// Simplifications vs. docs/DESIGN.md (kept deliberately, not silently
+// Turns are simultaneous: each round, the player commits one action and the
+// CPU independently picks its own (from state alone -- chooseCpuAction never
+// looks at the player's chosen action), then both resolve together. This is
+// PvE-only for now (docs/DESIGN.md's "both players act at the same time" for
+// real PvP still needs a server so neither side can see the other's pending
+// move; here the CPU just genuinely doesn't look, which is enough for a
+// single browser tab -- see "Architecture implications" in docs/DESIGN.md).
+//
+// Other simplifications vs. docs/DESIGN.md (kept deliberately, not silently
 // dropped):
-// - Turns are sequential (player, then CPU), not simultaneous -- true
-//   simultaneous resolution needs a server; see "Architecture implications"
-//   in docs/DESIGN.md.
 // - No fog of war / troop placement yet.
 // - A defend card fully replaces any earlier active defend of the same damage
 //   type rather than adding to it, even when `stacking` is STACKABLE -- true
@@ -132,22 +137,11 @@ function resolveStatusEffects(actor, target, card) {
   }
 }
 
-function playCard(actor, opponent, card) {
-  switch (card.category) {
-    case CARD_CATEGORY.ATTACK:
-      resolveAttack(actor, opponent, card);
-      break;
-    case CARD_CATEGORY.DEFEND:
-      resolveDefend(actor, card);
-      break;
-    case CARD_CATEGORY.BUFF:
-      resolveStatusEffects(actor, actor, card);
-      break;
-    case CARD_CATEGORY.DEBUFF:
-      resolveStatusEffects(actor, opponent, card);
-      break;
-  }
-
+// Remove a played card from hand into the discard pile and count it toward
+// its category's synergy. Shared by every card category -- attack cards get
+// this too, even though their actual effect is resolved later (see
+// applyDamagePhase) so that both sides' attacks use post-setup state.
+function commitCardHousekeeping(actor, card) {
   actor.cardsPlayedByCategory[card.category] += 1;
   const index = actor.hand.findIndex((c) => c.id === card.id);
   if (index !== -1) actor.hand.splice(index, 1);
@@ -195,13 +189,19 @@ function regenAndDraw(fighter) {
 }
 
 // --- battle-level state --------------------------------------------------
+//
+// An "action" a fighter commits to a round is one of:
+//   { kind: "card", card }
+//   { kind: "ultimate" }
+//   { kind: "none" }        -- nothing available to play (empty hand)
 
 function createBattle(playerClass, cpuClass) {
   const battle = {
     player: createFighter(playerClass, buildDeckForClass(playerClass)),
     cpu: createFighter(cpuClass, buildDeckForClass(cpuClass)),
-    turn: "player",
-    winner: null,
+    round: 1,
+    winner: null, // the winning fighter, or null while the game is ongoing
+    draw: false,  // true if both fighters ran out of HP in the same round
     log: [],
   };
   drawUpTo(battle.player);
@@ -214,88 +214,138 @@ function addLog(battle, message) {
   battle.log.unshift(message);
 }
 
-function checkWinner(battle) {
-  if (battle.cpu.hp <= 0) battle.winner = battle.player;
-  else if (battle.player.hp <= 0) battle.winner = battle.cpu;
-  if (battle.winner) addLog(battle, `${battle.winner.classDef.name} wins!`);
+function isBattleOver(battle) {
+  return Boolean(battle.winner) || battle.draw;
 }
 
-function playerPlayCard(battle, cardId) {
-  if (battle.winner || battle.turn !== "player") return;
-  const card = battle.player.hand.find((c) => c.id === cardId);
-  if (!card) return;
+// --- committing an action (without resolving it yet) ----------------------
 
-  tickStatusDurations(battle.player);
-  playCard(battle.player, battle.cpu, card);
-  addLog(battle, `You play ${card.name} (${card.category}).`);
-  checkWinner(battle);
-  if (battle.winner) return;
-
-  regenAndDraw(battle.player);
-  battle.turn = "cpu";
+function cardAction(fighter, cardId) {
+  const card = fighter.hand.find((c) => c.id === cardId);
+  return card ? { kind: "card", card } : null;
 }
 
-function playerUseUltimate(battle) {
-  if (battle.winner || battle.turn !== "player" || !canUseUltimate(battle.player)) return;
-
-  tickStatusDurations(battle.player);
-  const damage = useUltimate(battle.player, battle.cpu);
-  addLog(battle, `You unleash your ultimate for ${damage} damage!`);
-  checkWinner(battle);
-  if (battle.winner) return;
-
-  regenAndDraw(battle.player);
-  battle.turn = "cpu";
+function ultimateAction(fighter) {
+  return canUseUltimate(fighter) ? { kind: "ultimate" } : null;
 }
 
 // Very simple CPU: use its ultimate the moment it's ready, otherwise defend
 // when low on HP, otherwise favor its strongest attack, with occasional
-// debuff/buff plays.
-function chooseCpuCard(battle) {
-  const hand = battle.cpu.hand;
-  if (hand.length === 0) return null;
+// debuff/buff plays. Deliberately reads only battle.cpu's own state -- never
+// the player's pending action -- so this is a fair simultaneous decision, not
+// a reaction to what the player is about to do.
+function chooseCpuAction(battle) {
+  const cpu = battle.cpu;
+  if (canUseUltimate(cpu)) return { kind: "ultimate" };
+
+  const hand = cpu.hand;
+  if (hand.length === 0) return { kind: "none" };
 
   const attacks = hand.filter((c) => c.category === CARD_CATEGORY.ATTACK);
   const defends = hand.filter((c) => c.category === CARD_CATEGORY.DEFEND);
   const debuffs = hand.filter((c) => c.category === CARD_CATEGORY.DEBUFF);
   const buffs = hand.filter((c) => c.category === CARD_CATEGORY.BUFF);
+  const lowHp = cpu.hp <= cpu.maxHp * 0.4;
 
-  const lowHp = battle.cpu.hp <= battle.cpu.maxHp * 0.4;
-
+  let card;
   if (lowHp && defends.length > 0) {
-    return defends.reduce((a, b) => (a.amount >= b.amount ? a : b));
+    card = defends.reduce((a, b) => (a.amount >= b.amount ? a : b));
+  } else if (attacks.length > 0 && Math.random() < 0.7) {
+    card = attacks.reduce((a, b) => (a.value >= b.value ? a : b));
+  } else if (debuffs.length > 0 && Math.random() < 0.5) {
+    card = debuffs[0];
+  } else if (buffs.length > 0) {
+    card = buffs[0];
+  } else {
+    card = hand[0];
   }
-  if (attacks.length > 0 && Math.random() < 0.7) {
-    return attacks.reduce((a, b) => (a.value >= b.value ? a : b));
-  }
-  if (debuffs.length > 0 && Math.random() < 0.5) return debuffs[0];
-  if (buffs.length > 0) return buffs[0];
-  return hand[0];
+  return { kind: "card", card };
 }
 
-function cpuTakeTurn(battle) {
-  if (battle.winner || battle.turn !== "cpu") return;
-  const cpu = battle.cpu;
-  tickStatusDurations(cpu);
+// --- resolving a round ------------------------------------------------------
 
-  if (canUseUltimate(cpu)) {
-    const damage = useUltimate(cpu, battle.player);
-    addLog(battle, `CPU unleashes its ultimate for ${damage} damage!`);
-  } else {
-    const card = chooseCpuCard(battle);
-    if (!card) {
-      battle.turn = "player";
-      return;
-    }
-    playCard(cpu, battle.player, card);
-    addLog(battle, `CPU plays ${card.name} (${card.category}).`);
+// Defends and buffs/debuffs from an action go live immediately (the "setup"
+// phase); attacks and ultimates are resolved afterwards for both sides (the
+// "damage" phase). Running every action's setup before anyone's damage is
+// what makes a defend card played this round able to block an attack played
+// this same round, instead of only protecting against the opponent's *next*
+// round -- the two sides' choices are hidden from each other but resolve
+// together.
+function applySetupPhase(actor, opponent, action, battle) {
+  if (action.kind !== "card") return;
+  const card = action.card;
+  commitCardHousekeeping(actor, card);
+
+  switch (card.category) {
+    case CARD_CATEGORY.DEFEND:
+      resolveDefend(actor, card);
+      addLog(battle, `${actor.classDef.name} sets up ${card.name} (defend).`);
+      break;
+    case CARD_CATEGORY.BUFF:
+      resolveStatusEffects(actor, actor, card);
+      addLog(battle, `${actor.classDef.name} plays ${card.name} (buff).`);
+      break;
+    case CARD_CATEGORY.DEBUFF:
+      resolveStatusEffects(actor, opponent, card);
+      addLog(battle, `${actor.classDef.name} plays ${card.name} (debuff).`);
+      break;
+    // ATTACK is resolved in applyDamagePhase, once both sides' defends and
+    // buffs/debuffs for this round are already in place.
   }
+}
 
-  checkWinner(battle);
-  if (battle.winner) return;
+function applyDamagePhase(actor, opponent, action, battle) {
+  if (action.kind === "ultimate") {
+    const damage = useUltimate(actor, opponent);
+    addLog(battle, `${actor.classDef.name} unleashes its ultimate for ${damage} damage!`);
+  } else if (action.kind === "card" && action.card.category === CARD_CATEGORY.ATTACK) {
+    const damage = resolveAttack(actor, opponent, action.card);
+    addLog(battle, `${actor.classDef.name} hits with ${action.card.name} for ${damage} damage.`);
+  }
+}
 
-  regenAndDraw(cpu);
-  battle.turn = "player";
+function checkOutcome(battle) {
+  const playerDown = battle.player.hp <= 0;
+  const cpuDown = battle.cpu.hp <= 0;
+
+  if (playerDown && cpuDown) {
+    battle.draw = true;
+    addLog(battle, "Both fighters go down at the same time -- it's a draw!");
+  } else if (cpuDown) {
+    battle.winner = battle.player;
+    addLog(battle, `${battle.player.classDef.name} wins!`);
+  } else if (playerDown) {
+    battle.winner = battle.cpu;
+    addLog(battle, `${battle.cpu.classDef.name} wins!`);
+  }
+}
+
+// Commit the player's chosen action for this round, have the CPU
+// independently commit its own, then resolve both together.
+function playRound(battle, playerAction) {
+  if (isBattleOver(battle) || !playerAction) return;
+
+  const cpuAction = chooseCpuAction(battle);
+
+  // Durations tick down at the start of the round, before either side's
+  // choice resolves, so something set up last round is still live for this
+  // round's simultaneous resolution and only expires once a full round has
+  // passed.
+  tickStatusDurations(battle.player);
+  tickStatusDurations(battle.cpu);
+
+  addLog(battle, `-- Round ${battle.round} --`);
+  applySetupPhase(battle.player, battle.cpu, playerAction, battle);
+  applySetupPhase(battle.cpu, battle.player, cpuAction, battle);
+  applyDamagePhase(battle.player, battle.cpu, playerAction, battle);
+  applyDamagePhase(battle.cpu, battle.player, cpuAction, battle);
+
+  checkOutcome(battle);
+  if (isBattleOver(battle)) return;
+
+  regenAndDraw(battle.player);
+  regenAndDraw(battle.cpu);
+  battle.round += 1;
 }
 
 // --- small text helpers used by the UI -----------------------------------
