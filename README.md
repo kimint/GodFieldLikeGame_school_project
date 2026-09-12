@@ -17,6 +17,13 @@ python -m http.server 8000
 
 Then open `http://localhost:8000` in a browser.
 
+If you pull an update and the page looks visually broken (wrong card sizes, unstyled buttons,
+overlapping text) even though the content looks current, your browser is almost certainly showing
+a cached copy of an old `style.css`/script instead of the one you just pulled — hard-refresh
+(Ctrl+Shift+R / Cmd+Shift+R) rather than assuming something is missing. Every stylesheet/script
+tag is loaded with a `?v=N` query string precisely so this shouldn't happen; if you still hit it,
+bump the `N` in `index.html` (and `model-demo.html` / `legacy/index.html` if those changed too).
+
 ## How it plays
 
 1. Pick a class (currently **Guardian** — tanky, physical, rewards playing defend cards; or
