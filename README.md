@@ -31,16 +31,20 @@ Then open `http://localhost:8000` in a browser.
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | Page skeleton |
+| `index.html` | Page skeleton for the playable prototype above |
 | `src/style.css` | Styling |
-| `src/cards.js` | Card type definitions and deck creation |
+| `src/cards.js` | Card type definitions and deck creation (prototype) |
 | `src/game.js` | Game state and rules (pure logic, no DOM) |
 | `src/ui.js` | Rendering and click handling |
+| `docs/DESIGN.md` | Design notes for the bigger v2 mechanics (classes, synergies, simultaneous turns, fog of war) |
+| `src/model/` | Data model for classes/stats/synergies/card types described in `docs/DESIGN.md` — not wired into the prototype above yet |
+| `model-demo.html` | Standalone smoke test for `src/model/`; open it in a browser to see pass/fail checks |
 
 ## Ideas for next steps
 
 - Two-player hotseat, or online multiplayer
-- More card types (healing, reflect, status effects, and other Godfield-style items)
+- Wire `src/model/` into an actual playable game (it's currently just data + a smoke test)
+- A server (or shared session) to support simultaneous turns and fog of war — see "Architecture implications" in `docs/DESIGN.md`
 - Draw only 1 card per turn to add a resource-management element
 - Animations / sound effects
 - Tests for the rules logic
