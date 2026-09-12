@@ -14,7 +14,7 @@ const el = {
   playerPanel: document.getElementById("player-panel"),
   hand: document.getElementById("hand"),
   log: document.getElementById("log"),
-  turn: document.getElementById("turn"),
+  status: document.getElementById("status"),
   restart: document.getElementById("restart"),
   ultimateBtn: document.getElementById("ultimate-btn"),
 };
@@ -99,6 +99,8 @@ function renderFighterPanel(container, fighter, label) {
 }
 
 function render() {
+  const over = Boolean(battle.winner) || battle.draw;
+
   renderFighterPanel(el.cpuPanel, battle.cpu, "CPU");
   renderFighterPanel(el.playerPanel, battle.player, "Player");
 
@@ -106,7 +108,7 @@ function render() {
   for (const card of battle.player.hand) {
     const button = document.createElement("button");
     button.className = `card card--${card.category}`;
-    button.disabled = battle.turn !== "player" || battle.winner !== null;
+    button.disabled = over;
 
     const category = document.createElement("span");
     category.className = "card__type";
@@ -126,47 +128,46 @@ function render() {
   }
 
   el.log.innerHTML = "";
-  for (const line of battle.log.slice(0, 14)) {
+  for (const line of battle.log.slice(0, 16)) {
     const li = document.createElement("li");
     li.textContent = line;
     el.log.appendChild(li);
   }
 
   if (battle.winner) {
-    el.turn.textContent = `${battle.winner.classDef.name} wins! Press "Restart" to play again.`;
+    el.status.textContent = `${battle.winner.classDef.name} wins! Press "Restart" to play again.`;
+  } else if (battle.draw) {
+    el.status.textContent = `Draw! Press "Restart" to play again.`;
   } else {
-    el.turn.textContent = battle.turn === "player" ? "Your turn" : "CPU's turn...";
+    el.status.textContent = `Round ${battle.round} — pick a card. The CPU is choosing at the same time.`;
   }
 
-  el.ultimateBtn.disabled = battle.turn !== "player" || battle.winner !== null || !canUseUltimate(battle.player);
+  el.ultimateBtn.disabled = over || !canUseUltimate(battle.player);
 }
 
 // --- input handling ---------------------------------------------------------
+//
+// Both of these commit the player's action and resolve the whole round in
+// one call (playRound picks the CPU's action itself, without seeing this
+// one) -- there's no separate "wait for the CPU" step because nothing is
+// waiting on anything, the two choices resolve together.
 
 function onCardClick(cardId) {
-  if (battle.turn !== "player" || battle.winner) return;
+  if (Boolean(battle.winner) || battle.draw) return;
+  const action = cardAction(battle.player, cardId);
+  if (!action) return;
 
-  playerPlayCard(battle, cardId);
+  playRound(battle, action);
   render();
-  if (battle.winner) return;
-
-  setTimeout(() => {
-    cpuTakeTurn(battle);
-    render();
-  }, 700);
 }
 
 el.ultimateBtn.addEventListener("click", () => {
-  if (!battle || battle.turn !== "player" || battle.winner) return;
+  if (!battle || battle.winner || battle.draw) return;
+  const action = ultimateAction(battle.player);
+  if (!action) return;
 
-  playerUseUltimate(battle);
+  playRound(battle, action);
   render();
-  if (battle.winner) return;
-
-  setTimeout(() => {
-    cpuTakeTurn(battle);
-    render();
-  }, 700);
 });
 
 el.restart.addEventListener("click", () => {

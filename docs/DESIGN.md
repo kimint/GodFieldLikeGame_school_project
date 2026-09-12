@@ -1,16 +1,19 @@
 # Design Notes — Core Gameplay Mechanics (v2 concept)
 
-Status: **not implemented yet.** This is a working spec for where the game is headed,
-kept separate from the current playable prototype (sequential turns, fully visible
-state, single-file client, CPU opponent — see the root [README](../README.md)).
-Building the mechanics below is a bigger architectural step than the current
-prototype; see "Architecture implications" at the bottom.
+Status: **partially implemented.** Simultaneous turn resolution and the class/synergy/
+card system are playable now (`index.html`, `src/model/`) against a CPU opponent — see
+the root [README](../README.md). PvP and fog of war are still just notes below; see
+"Architecture implications" for why those two specifically need more than the current
+single-page client.
 
 ## Turn resolution
 
-- Both players take their turns at the same time; all actions resolve simultaneously
-  (not sequential like the current prototype).
-- Fog of war when placing troops.
+- Both players take their turns at the same time; all actions resolve simultaneously.
+  **Implemented for PvE**: each round the player commits a card and the CPU
+  independently picks its own from state alone (never the player's pending choice),
+  then both resolve together — see `src/model/engine.js` (`playRound`). Real PvP
+  still needs a server; see "Architecture implications".
+- Fog of war when placing troops. **Not implemented.**
 
 ## Class system / deck synergy system
 
@@ -64,20 +67,22 @@ Class-based, and modified by synergies.
 
 ## Architecture implications
 
-The current prototype is a single static-HTML page with no server: one browser tab
-runs both the player and a scripted CPU, and all state (both hands, both HP bars) is
-visible in the same page. Two mechanics above break that model:
+The game is a single static-HTML page with no server: one browser tab runs both the
+player and a scripted CPU, and all state (both hands, both HP bars) is visible in the
+same page object. That turned out to be enough for **simultaneous resolution against a
+CPU**: the CPU's code simply never reads the player's pending action before choosing
+its own (see `chooseCpuAction` in `src/model/engine.js`), so "neither side sees the
+other's move first" holds even though both live in the same JS object — there was
+never a real information-hiding problem, just an AI that had to not peek.
 
-- **Simultaneous resolution** — both sides commit an action before either is
-  revealed, so one player's client can't just read the other's move out of shared
-  in-memory state the way the CPU does now.
-- **Fog of war** — each player must see less than the full game state, which means
-  the state can't simply live in one page's `game` object either.
-
-Either of these needs a source of truth outside a single browser tab that hides
-each player's pending action until both are submitted (a server, or something like
-a shared session both clients poll/connect to) before the client-only prototype can
-grow into this design.
+**Fog of war, and simultaneous resolution against a human PvP opponent, are different
+because a human can inspect page state a scripted CPU won't:** a real second player
+sitting at their own browser tab absolutely would read `battle.player.hand` or
+`battle.cpu.activeDefends` out of the page if the whole game state lived in one place
+they both loaded. Those two need a source of truth outside a single browser tab that
+actually withholds each player's hand/pending action from the other's client until
+resolution — a server, or something like a shared session both clients poll/connect
+to — before PvP or fog of war can be built.
 
 ## Open questions to resolve before implementation
 

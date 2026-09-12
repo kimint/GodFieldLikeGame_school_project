@@ -21,19 +21,23 @@ Then open `http://localhost:8000` in a browser.
 
 1. Pick a class (currently **Guardian** — tanky, physical, rewards playing defend cards; or
    **Pyromancer** — fragile, elemental, faster ultimate charge). The CPU gets the other one.
-2. Each turn, play one card from your hand:
+2. Each round, you and the CPU pick a card (or ultimate) **at the same time** — the CPU commits
+   to its move without knowing yours, and then both resolve together:
    - **Attack**: deals damage of a type (physical / magic / element / true). The defender's
      matching resistance stat (DEF / MR / ER — true ignores all of them) reduces it, and so does
-     any active defend card of the same type.
-   - **Defend**: blocks incoming damage of one type, flat or percent, for a number of turns.
+     any active defend card of the same type — including one committed this same round.
+   - **Defend**: blocks incoming damage of one type, flat or percent, for a number of rounds.
+     Because it's simultaneous, a defend you commit this round can block an attack the CPU
+     commits this same round.
    - **Buff**: a positive effect on yourself (e.g. more ultimate regen).
    - **Debuff**: a negative effect on the opponent (e.g. drain their ultimate meter, or disable
-     one of their synergies for a few turns).
+     one of their synergies for a few rounds).
 3. Your class's synergy gets stronger tiers the more you play the card type it rewards (e.g.
    Guardian's Bulwark synergy raises DEF further the more defend cards you've played).
-4. Every turn your ultimate meter fills by your UR (ultimate regen) stat. Once it's full, "Use
+4. Every round your ultimate meter fills by your UR (ultimate regen) stat. Once it's full, "Use
    Ultimate" becomes available as an extra action instead of playing a card.
-5. Reduce the opponent's HP to 0 to win.
+5. Reduce the opponent's HP to 0 to win. If a round drops both fighters to 0 HP at once, it's a
+   draw.
 
 Card names/numbers and the two example classes are placeholders for wiring the system together,
 not tuned game balance — see the open questions in `docs/DESIGN.md`.
@@ -63,13 +67,15 @@ not tuned game balance — see the open questions in `docs/DESIGN.md`.
 | `classes.js` | Class definitions and effective-stat calculation |
 | `data.js` | The two example classes/synergies and some example cards (used by `model-demo.html`) |
 | `decks.js` | Deck blueprints for the two example classes (used by the actual game) |
-| `engine.js` | The turn loop: playing cards, resolving damage/effects, ultimates, a simple CPU |
+| `engine.js` | The round loop: simultaneous card/ultimate resolution, damage/effects, a simple CPU |
 | `demo.js` | The assertions rendered by `model-demo.html` |
 
 ## Known simplifications (see docs/DESIGN.md for the full list)
 
-- Turns are sequential (player, then CPU) — not the simultaneous resolution described in the
-  design notes, which needs a server.
+- Simultaneous resolution is PvE-only for now: the CPU genuinely doesn't look at the player's
+  pending action, which is enough within one browser tab. Real PvP still needs a server so a
+  human opponent's client can't just read the other player's hand/action out of shared page
+  state — see "Architecture implications" in `docs/DESIGN.md`.
 - No fog of war / troop placement.
 - A defend card fully replaces an earlier one of the same damage type rather than stacking
   amounts, even when marked stackable.
@@ -77,8 +83,8 @@ not tuned game balance — see the open questions in `docs/DESIGN.md`.
 
 ## Ideas for next steps
 
-- Two-player hotseat, or online multiplayer
-- A server (or shared session) to support simultaneous turns and fog of war
+- Online PvP (a server that actually withholds each side's hand/pending action from the other)
+- Fog of war
 - More classes/synergies/cards with real (not placeholder) names and balance
 - Real stacking for stackable defend cards
 - Draw only 1 card per turn to add a resource-management element
