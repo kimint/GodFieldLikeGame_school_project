@@ -15,8 +15,11 @@ function createClass({ id, name, baseStats, synergyPool, ultimate, passives = []
 
 // Placeholder ultimate shape -- naming/theme is still an open question
 // (docs/DESIGN.md: "name it something related to all in aspect maybe").
-function createUltimate({ id, name, description, cost }) {
-  return { id, name, description, cost };
+// `damage` is a placeholder generic effect (flat true damage) just so the
+// meter-fills-then-use mechanic is demonstrable end to end; real ultimate
+// design (and whether it's even damage-shaped) is still undecided.
+function createUltimate({ id, name, description, cost, damage = 0 }) {
+  return { id, name, description, cost, damage };
 }
 
 // Apply a list of effects on top of a class's base stats. Only STAT_MODIFIER

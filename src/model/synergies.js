@@ -8,9 +8,13 @@
 // resolves each synergy in the pool independently, so the caller decides how
 // many can be active at once.
 
-// tiers: [{ count, effects }], meant to be given in ascending order of `count`.
-function createSynergy({ id, name, description, tiers }) {
-  return { id, name, description, tiers };
+// tiers: [{ count, effects }], meant to be given in ascending order of
+// `count`. `countsCategory` is read by the engine (src/model/engine.js) to
+// know which card category played this match counts toward this synergy's
+// tier -- resolveSynergies below doesn't touch it directly, it just takes
+// whatever activeCounts the caller hands it.
+function createSynergy({ id, name, description, tiers, countsCategory }) {
+  return { id, name, description, tiers, countsCategory };
 }
 
 // Given how many pieces of a synergy are currently active (e.g. cards of that

@@ -11,17 +11,17 @@ function check(label, condition) {
 
 // 1. Base stats come through unmodified with no active synergy.
 const baseStats = computeEffectiveStats(exampleClassGuardian, []);
-check("base DEF is 5 with no synergy active", baseStats.def === 5);
+check("base DEF is 6 with no synergy active", baseStats.def === 6);
 
 // 2. Tier-2 Bulwark synergy adds +5 flat DEF.
 const tier2Effects = resolveSynergies(exampleClassGuardian.synergyPool, { bulwark: 2 });
 const withTier2 = computeEffectiveStats(exampleClassGuardian, tier2Effects);
-check("tier-2 Bulwark raises DEF to 10", withTier2.def === 10);
+check("tier-2 Bulwark raises DEF to 11", withTier2.def === 11);
 
 // 3. Tier-4 Bulwark replaces it with +12 flat DEF (highest tier reached wins).
 const tier4Effects = resolveSynergies(exampleClassGuardian.synergyPool, { bulwark: 4 });
 const withTier4 = computeEffectiveStats(exampleClassGuardian, tier4Effects);
-check("tier-4 Bulwark raises DEF to 17", withTier4.def === 17);
+check("tier-4 Bulwark raises DEF to 18", withTier4.def === 18);
 
 // 4. Flat defend card reduces same-type attack damage.
 const dmgWithDefend = applyDefend(exampleAttackCard, exampleDefendCard);

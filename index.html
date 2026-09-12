@@ -9,39 +9,50 @@
 <body>
   <main class="app">
     <h1>Godfield-lite</h1>
-    <p class="subtitle">Pick an attack or defense card and battle the CPU.</p>
+    <p class="subtitle">
+      Class-based card battle: attack / defend / buff / debuff, synergies, and an ultimate meter.
+      (The original simple prototype still lives at <code>legacy/index.html</code>.)
+    </p>
 
-    <section class="board">
-      <div class="fighter">
-        <h2>CPU</h2>
-        <p>HP <span id="cpu-hp">40</span></p>
-        <p>Shield <span id="cpu-shield">0</span></p>
-      </div>
-      <div class="fighter">
-        <h2>Player</h2>
-        <p>HP <span id="player-hp">40</span></p>
-        <p>Shield <span id="player-shield">0</span></p>
-      </div>
+    <section id="class-select">
+      <h2>Choose your class</h2>
+      <div id="class-options" class="class-options"></div>
     </section>
 
-    <p id="turn" class="turn"></p>
+    <section id="battle" hidden>
+      <section class="board">
+        <div class="fighter" id="cpu-panel"></div>
+        <div class="fighter" id="player-panel"></div>
+      </section>
 
-    <section>
-      <h2>Your hand</h2>
-      <div id="hand" class="hand"></div>
-    </section>
+      <p id="turn" class="turn"></p>
 
-    <button id="restart" class="restart">Restart</button>
+      <section>
+        <h2>Your hand</h2>
+        <div id="hand" class="hand"></div>
+        <button id="ultimate-btn" class="ultimate-btn" disabled>Use Ultimate</button>
+      </section>
 
-    <section>
-      <h2>Battle log</h2>
-      <ul id="log" class="log"></ul>
+      <button id="restart" class="restart">Restart</button>
+
+      <section>
+        <h2>Battle log</h2>
+        <ul id="log" class="log"></ul>
+      </section>
     </section>
   </main>
 
-  <!-- Loaded in order without a build step (cards -> game -> ui) -->
-  <script src="src/cards.js"></script>
-  <script src="src/game.js"></script>
-  <script src="src/ui.js"></script>
+  <!-- Loaded in dependency order -->
+  <script src="src/model/util.js"></script>
+  <script src="src/model/stats.js"></script>
+  <script src="src/model/damageTypes.js"></script>
+  <script src="src/model/effects.js"></script>
+  <script src="src/model/cardTypes.js"></script>
+  <script src="src/model/synergies.js"></script>
+  <script src="src/model/classes.js"></script>
+  <script src="src/model/data.js"></script>
+  <script src="src/model/decks.js"></script>
+  <script src="src/model/engine.js"></script>
+  <script src="src/app.js"></script>
 </body>
 </html>
