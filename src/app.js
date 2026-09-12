@@ -19,6 +19,17 @@ const el = {
   ultimateBtn: document.getElementById("ultimate-btn"),
 };
 
+// --- small icon helper ------------------------------------------------------
+
+// Build a <span class="inline-icon"> (or a custom className) wrapping some
+// icon markup from src/icons.js, so it can be dropped inline next to text.
+function inlineIcon(markup, className = "inline-icon") {
+  const span = document.createElement("span");
+  span.className = className;
+  span.innerHTML = markup;
+  return span;
+}
+
 // --- class select ---------------------------------------------------------
 
 function renderClassSelect() {
@@ -27,8 +38,12 @@ function renderClassSelect() {
     const card = document.createElement("button");
     card.className = "class-card";
 
+    const header = document.createElement("div");
+    header.className = "class-card__header";
+    const icon = inlineIcon(classIconMarkup(classDef), "class-card__icon");
     const title = document.createElement("h3");
     title.textContent = classDef.name;
+    header.append(icon, title);
 
     const stats = document.createElement("p");
     stats.textContent =
@@ -39,10 +54,14 @@ function renderClassSelect() {
     synergy.textContent = `Synergy: ${classDef.synergyPool.map((s) => s.name).join(", ")}`;
 
     const ultimate = document.createElement("p");
-    ultimate.textContent =
-      `Ultimate: ${classDef.ultimate.name} (cost ${classDef.ultimate.cost}, ${classDef.ultimate.damage} dmg)`;
+    ultimate.append(
+      inlineIcon(ultimateIconMarkup()),
+      document.createTextNode(
+        `Ultimate: ${classDef.ultimate.name} (cost ${classDef.ultimate.cost}, ${classDef.ultimate.damage} dmg)`
+      )
+    );
 
-    card.append(title, stats, synergy, ultimate);
+    card.append(header, stats, synergy, ultimate);
     card.addEventListener("click", () => startBattle(classDef));
     el.classOptions.appendChild(card);
   }
@@ -65,7 +84,10 @@ function renderFighterPanel(container, fighter, label) {
   container.innerHTML = "";
 
   const heading = document.createElement("h2");
-  heading.textContent = `${label} — ${fighter.classDef.name}`;
+  heading.append(
+    inlineIcon(classIconMarkup(fighter.classDef)),
+    document.createTextNode(`${label} — ${fighter.classDef.name}`)
+  );
   container.appendChild(heading);
 
   const hp = document.createElement("p");
@@ -94,7 +116,10 @@ function renderFighterPanel(container, fighter, label) {
 
   const meterLabel = document.createElement("p");
   meterLabel.className = "meter__label";
-  meterLabel.textContent = `Ultimate ${fighter.ultimateMeter}/${fighter.classDef.ultimate.cost}`;
+  meterLabel.append(
+    inlineIcon(ultimateIconMarkup()),
+    document.createTextNode(`Ultimate ${fighter.ultimateMeter}/${fighter.classDef.ultimate.cost}`)
+  );
   container.appendChild(meterLabel);
 }
 
@@ -164,6 +189,12 @@ function onCardClick(cardId) {
   playRound(battle, action);
   render();
 }
+
+// The button's label never changes (only its disabled state does, in
+// render()), so build it once here instead of every render. Clears the
+// static "Use Ultimate" text from index.html first so it isn't duplicated.
+el.ultimateBtn.textContent = "";
+el.ultimateBtn.append(inlineIcon(ultimateIconMarkup()), document.createTextNode("Use Ultimate"));
 
 el.ultimateBtn.addEventListener("click", () => {
   if (!battle || battle.winner || battle.draw) return;
