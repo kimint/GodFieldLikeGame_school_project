@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Godfield-lite Model Demo</title>
-  <link rel="stylesheet" href="src/style.css" />
+  <!-- ?v=N cache-buster: bump it whenever style.css or any script below
+       changes -- see index.html for why. -->
+  <link rel="stylesheet" href="src/style.css?v=1" />
   <style>
     #results { list-style: none; padding: 0; font-family: monospace; }
     #results .pass { color: #7fd18a; }
@@ -26,14 +28,14 @@
     <ul id="results"></ul>
   </main>
 
-  <!-- Loaded in dependency order -->
-  <script src="src/model/stats.js"></script>
-  <script src="src/model/damageTypes.js"></script>
-  <script src="src/model/effects.js"></script>
-  <script src="src/model/cardTypes.js"></script>
-  <script src="src/model/synergies.js"></script>
-  <script src="src/model/classes.js"></script>
-  <script src="src/model/data.js"></script>
-  <script src="src/model/demo.js"></script>
+  <!-- Loaded in dependency order. Same ?v=1 cache-buster as style.css above. -->
+  <script src="src/model/stats.js?v=1"></script>
+  <script src="src/model/damageTypes.js?v=1"></script>
+  <script src="src/model/effects.js?v=1"></script>
+  <script src="src/model/cardTypes.js?v=1"></script>
+  <script src="src/model/synergies.js?v=1"></script>
+  <script src="src/model/classes.js?v=1"></script>
+  <script src="src/model/data.js?v=1"></script>
+  <script src="src/model/demo.js?v=1"></script>
 </body>
 </html>
