@@ -62,8 +62,8 @@ h2 {
 }
 
 .card {
-  width: 104px;
-  height: 132px;
+  width: 108px;
+  height: 156px;
   border: none;
   border-radius: 10px;
   display: flex;
@@ -92,6 +92,18 @@ h2 {
 .card--defend { background: #2f6f8f; }
 .card--buff { background: #3a8f5a; }
 .card--debuff { background: #6a4a94; }
+
+.card__icon {
+  width: 34px;
+  height: 34px;
+  display: block;
+}
+
+.card__icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 .card__type {
   font-size: 0.7rem;

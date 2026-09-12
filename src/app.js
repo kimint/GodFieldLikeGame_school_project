@@ -110,6 +110,10 @@ function render() {
     button.className = `card card--${card.category}`;
     button.disabled = over;
 
+    const icon = document.createElement("span");
+    icon.className = "card__icon";
+    icon.innerHTML = cardIconMarkup(card);
+
     const category = document.createElement("span");
     category.className = "card__type";
     category.textContent = card.category;
@@ -122,7 +126,7 @@ function render() {
     detail.className = "card__value";
     detail.textContent = describeCard(card);
 
-    button.append(category, name, detail);
+    button.append(icon, category, name, detail);
     button.addEventListener("click", () => onCardClick(card.id));
     el.hand.appendChild(button);
   }

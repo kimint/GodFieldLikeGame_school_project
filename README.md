@@ -1,9 +1,10 @@
 # GodFieldLikeGame_school_project
 
 A card battle game prototype based on the browser game [Godfield](https://godfield.net/).
-There is no art — cards are just a category and some numbers on them. Classes have their own
-stats, a synergy that gets stronger the more you lean into it, and an ultimate that charges up
-over time. See [docs/DESIGN.md](docs/DESIGN.md) for the full design notes this is built from.
+There's no illustrated artwork — each card has a small hand-drawn SVG icon (see "Card art" below)
+plus a category and some numbers. Classes have their own stats, a synergy that gets stronger the
+more you lean into it, and an ultimate that charges up over time. See
+[docs/DESIGN.md](docs/DESIGN.md) for the full design notes this is built from.
 
 ## Running it
 
@@ -49,12 +50,22 @@ bump the `N` in `index.html` (and `model-demo.html` / `legacy/index.html` if tho
 Card names/numbers and the two example classes are placeholders for wiring the system together,
 not tuned game balance — see the open questions in `docs/DESIGN.md`.
 
+## Card art
+
+There's no tool in this environment that generates illustrations, so each card gets a small
+hand-authored SVG icon instead (`src/icons.js`): one base shape per category — sword (attack),
+shield (defend), upward spark (buff), downward drain (debuff) — plus a small colored corner dot
+on attack/defend cards showing their damage type (grey physical, violet magic, orange element,
+gold true). It's driven by the card's data (`category`/`damageType`), not its name, so any new
+card automatically gets a sensible icon without adding one by hand.
+
 ## File layout
 
 | Path | Purpose |
 | --- | --- |
 | `index.html` | The game above |
 | `src/app.js` | UI: class select, battle screen, rendering, input handling |
+| `src/icons.js` | Small hand-authored SVG icon per card category (+ a damage-type accent dot) — see "Card art" below |
 | `src/style.css` | Styling |
 | `src/model/` | The class/stat/synergy/card data model + battle engine (see below) |
 | `docs/DESIGN.md` | Design notes this is built from, including what's still open/unimplemented |
