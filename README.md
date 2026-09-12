@@ -52,12 +52,23 @@ not tuned game balance — see the open questions in `docs/DESIGN.md`.
 
 ## Card art
 
-There's no tool in this environment that generates illustrations, so each card gets a small
-hand-authored SVG icon instead (`src/icons.js`): one base shape per category — sword (attack),
-shield (defend), upward spark (buff), downward drain (debuff) — plus a small colored corner dot
-on attack/defend cards showing their damage type (grey physical, violet magic, orange element,
-gold true). It's driven by the card's data (`category`/`damageType`), not its name, so any new
-card automatically gets a sensible icon without adding one by hand.
+There's no tool in this environment that generates illustrations, so cards, classes, and the
+ultimate each get a small hand-authored SVG icon instead (`src/icons.js`):
+
+- **Cards**: one base shape per category — sword (attack), shield (defend), upward spark (buff),
+  downward drain (debuff) — plus a small colored corner dot on attack/defend cards showing their
+  damage type (grey physical, violet magic, orange element, gold true). Driven by the card's data
+  (`category`/`damageType`), not its name, so any new card automatically gets a sensible icon
+  without adding one by hand.
+- **Classes**: one emblem per class id (a blue crest-shield for Guardian, a two-tone flame for
+  Pyromancer), shown on the class-select card and the fighter panel heading. A class with no
+  entry in `CLASS_ICON_BODY` just renders without an icon rather than erroring, so adding a new
+  class doesn't require adding its icon at the same time.
+- **Ultimate**: a single generic gold "burst" icon shared by every class, next to the "Use
+  Ultimate" button, each class-select card's ultimate line, and the ultimate meter label. It's
+  shared rather than per-class because the ultimate's actual theme/name is still an open question
+  (see `docs/DESIGN.md`) — a per-class ultimate icon would be guessing at design that hasn't
+  happened yet.
 
 ## File layout
 

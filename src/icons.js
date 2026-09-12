@@ -1,8 +1,7 @@
-// Simple hand-authored SVG icons for cards -- there's still no illustrated
-// artwork (see README's "no art" note), just a small pictographic layer so
-// each card has *something* visual beyond text: one base shape per card
-// category, plus a small colored corner dot on attack/defend cards showing
-// their damage type.
+// Simple hand-authored SVG icons for cards, classes, and the ultimate --
+// there's still no illustrated artwork (see README's "Card art" note), just a
+// small pictographic layer so each of these has *something* visual beyond
+// text.
 //
 // This is UI-only (produces markup strings for src/app.js to insert), so it
 // lives alongside app.js rather than in src/model/, which stays DOM-free.
@@ -49,4 +48,56 @@ function cardIconMarkup(card) {
     ? `<circle cx="19.5" cy="4.5" r="2.6" fill="${accent}" stroke="#1e2230" stroke-width="0.8"/>`
     : "";
   return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}${dot}</svg>`;
+}
+
+// --- class icons -----------------------------------------------------------
+//
+// One emblem per class id, shown on the class-select card and the fighter
+// panel heading. Keyed by classDef.id rather than name so it survives a
+// rename; a class with no entry here just renders no icon.
+
+const CLASS_ICON_BODY = {
+  // A shield with a small crest, in the same blue as defend cards -- fits
+  // Guardian's tanky/defend-leaning theme.
+  guardian: `
+    <path d="M12 2 L20 5 V11 C20 16 16.5 20 12 22 C7.5 20 4 16 4 11 V5 Z" fill="#fff" opacity="0.92"/>
+    <path d="M12 6.5 L12 16.5" stroke="#2f6f8f" stroke-width="1.6"/>
+    <circle cx="12" cy="9.5" r="1.7" fill="#2f6f8f"/>
+  `,
+  // A two-tone flame, warm orange over a pale gold core -- fits Pyromancer's
+  // elemental/aggressive theme.
+  pyromancer: `
+    <path d="M12 2 C8 7 6 10 6 13.5 C6 17.6 8.7 21 12 21 C15.3 21 18 17.6 18 13.5
+             C18 11.8 17.3 10.2 16 9 C16.2 11 15.2 12.3 14 12.8
+             C14.6 10.5 13.6 8 12 2 Z" fill="#ff9d4d"/>
+    <path d="M12 9 C10.3 12 9.7 13.6 9.7 15.2 C9.7 17.1 10.7 18.5 12 18.5
+             C13.3 18.5 14.3 17.1 14.3 15.2 C14.3 14.3 14 13.5 13.4 12.8
+             C13.2 13.6 12.7 14.1 12.2 14.2 C12.6 12.9 12.3 11.5 12 9 Z" fill="#ffe066"/>
+  `,
+};
+
+// Returns "" (no icon) for a class id that isn't in CLASS_ICON_BODY, rather
+// than throwing -- a new class just quietly renders without one until an
+// icon is added for it.
+function classIconMarkup(classDef) {
+  const body = CLASS_ICON_BODY[classDef.id];
+  if (!body) return "";
+  return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
+}
+
+// --- ultimate icon -----------------------------------------------------------
+//
+// A single generic "burst" icon shared by every class's ultimate. Each class
+// doesn't get its own ultimate icon (the way it gets its own class icon)
+// because the ultimate's actual design/theme is still an open question --
+// see docs/DESIGN.md ("name it something related to all in aspect maybe").
+
+const ULTIMATE_ICON_BODY = `
+  <path d="M12 1 L14 8 L21 6 L16 11.5 L22 15 L14.5 15 L15.5 22 L12 16.5
+           L8.5 22 L9.5 15 L2 15 L8 11.5 L3 6 L10 8 Z" fill="#ffce54"/>
+  <circle cx="12" cy="12" r="2.6" fill="#fff8e1"/>
+`;
+
+function ultimateIconMarkup() {
+  return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${ULTIMATE_ICON_BODY}</svg>`;
 }
