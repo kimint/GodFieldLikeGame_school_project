@@ -4,10 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Godfield-lite Model Demo</title>
-  <!-- ?v=N cache-buster: bump it whenever style.css or any script below
-       changes -- see index.html for why. -->
-  <link rel="stylesheet" href="src/style.css?v=1" />
+  <!-- Standalone from src/style.css on purpose: that file now only styles
+       the Phaser canvas container for index.html (see src/scenes/), and this
+       page is a plain DOM page independent of the UI (see README.md). -->
   <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #1e2230;
+      color: #e8eaf0;
+    }
+    .app { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { text-align: center; margin-bottom: 4px; }
+    .subtitle { text-align: center; margin-top: 0; opacity: 0.7; font-size: 0.9rem; }
     #results { list-style: none; padding: 0; font-family: monospace; }
     #results .pass { color: #7fd18a; }
     #results .fail { color: #ff8080; }
@@ -28,14 +38,6 @@
     <ul id="results"></ul>
   </main>
 
-  <!-- Loaded in dependency order. Same ?v=1 cache-buster as style.css above. -->
-  <script src="src/model/stats.js?v=1"></script>
-  <script src="src/model/damageTypes.js?v=1"></script>
-  <script src="src/model/effects.js?v=1"></script>
-  <script src="src/model/cardTypes.js?v=1"></script>
-  <script src="src/model/synergies.js?v=1"></script>
-  <script src="src/model/classes.js?v=1"></script>
-  <script src="src/model/data.js?v=1"></script>
-  <script src="src/model/demo.js?v=1"></script>
+  <script type="module" src="/src/model/demo.js"></script>
 </body>
 </html>

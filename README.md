@@ -8,22 +8,30 @@ more you lean into it, and an ultimate that charges up over time. See
 
 ## Running it
 
-No build step required. Open `index.html` in a browser.
-
-Or serve it locally (requires Python):
+Built with [Vite](https://vitejs.dev/) + [Phaser](https://phaser.io/) — the whole UI (class select,
+battle screen) is drawn on a Phaser canvas; see "Architecture" below. Requires Node.js.
 
 ```bash
-python -m http.server 8000
+npm install
+npm run dev
 ```
 
-Then open `http://localhost:8000` in a browser.
+Then open the URL Vite prints (usually `http://localhost:5173`). Vite serves `index.html`,
+`model-demo.html`, and `legacy/index.html` directly — navigate to whichever you want.
 
-If you pull an update and the page looks visually broken (wrong card sizes, unstyled buttons,
-overlapping text) even though the content looks current, your browser is almost certainly showing
-a cached copy of an old `style.css`/script instead of the one you just pulled — hard-refresh
-(Ctrl+Shift+R / Cmd+Shift+R) rather than assuming something is missing. Every stylesheet/script
-tag is loaded with a `?v=N` query string precisely so this shouldn't happen; if you still hit it,
-bump the `N` in `index.html` (and `model-demo.html` / `legacy/index.html` if those changed too).
+```bash
+npm run build     # production build to dist/ (index.html + model-demo.html)
+npm run preview   # serve that production build locally
+```
+
+`legacy/` isn't part of the production build — its scripts are plain global `<script>` tags with
+no build step by design (see `legacy/` below), so there's nothing for Rollup to bundle. It's only
+served during `npm run dev`; if you need it in `dist/` too, copy `legacy/` over by hand.
+
+`src/**` is plain ES modules now (`import`/`export`), so Vite handles bundling and cache-busting
+(hashed filenames) automatically — the old `?v=N` query-string convention is gone from `index.html`
+and `model-demo.html`. `legacy/` is untouched (still global `<script>` tags with no build step);
+Vite serves it as-is.
 
 ## How it plays
 
@@ -50,6 +58,15 @@ bump the `N` in `index.html` (and `model-demo.html` / `legacy/index.html` if tho
 Card names/numbers and the two example classes are placeholders for wiring the system together,
 not tuned game balance — see the open questions in `docs/DESIGN.md`.
 
+## Architecture
+
+`src/model/*` is the entire game engine (classes, cards, synergies, the round loop) and knows
+nothing about rendering — no DOM, no Phaser. `src/scenes/*` is the Phaser UI on top of it:
+`ClassSelectScene` and `BattleScene` each call the model's functions (`createBattle`, `playRound`,
+...) and redraw themselves from the returned state. `src/phaserIcons.js` bridges the hand-authored
+SVG strings from `src/icons.js` into Phaser textures (base64 data URI → `this.load.svg`), so the
+icon art didn't need to be redrawn with Phaser's Graphics API.
+
 ## Card art
 
 There's no tool in this environment that generates illustrations, so cards, classes, and the
@@ -74,10 +91,14 @@ ultimate each get a small hand-authored SVG icon instead (`src/icons.js`):
 
 | Path | Purpose |
 | --- | --- |
-| `index.html` | The game above |
-| `src/app.js` | UI: class select, battle screen, rendering, input handling |
+| `index.html` | The game above — just a `#game` div; Phaser owns everything inside it |
+| `src/main.js` | Creates the `Phaser.Game` and registers the two scenes |
+| `src/scenes/ClassSelectScene.js` | Class-select screen |
+| `src/scenes/BattleScene.js` | Battle screen: renders the model's battle state, turns clicks into `playRound()` calls |
+| `src/scenes/theme.js` | Shared colors/fonts + small draw helpers (`roundedRect`, `createButton`) |
 | `src/icons.js` | Small hand-authored SVG icon per card category (+ a damage-type accent dot) — see "Card art" below |
-| `src/style.css` | Styling |
+| `src/phaserIcons.js` | Loads `src/icons.js`'s SVG markup as Phaser textures — see "Architecture" below |
+| `src/style.css` | Just positions the Phaser canvas; the UI itself has no DOM/CSS anymore |
 | `src/model/` | The class/stat/synergy/card data model + battle engine (see below) |
 | `docs/DESIGN.md` | Design notes this is built from, including what's still open/unimplemented |
 | `model-demo.html` | Standalone smoke test for `src/model/`, independent of the UI |
@@ -118,5 +139,5 @@ ultimate each get a small hand-authored SVG icon instead (`src/icons.js`):
 - Real stacking for stackable defend cards
 - Draw only 1 card per turn to add a resource-management element
 - Animations / sound effects
-- Tests for the rules logic (currently just the in-browser checks in `model-demo.html` and
-  ad hoc console scripts — no test runner, since this environment has no Node/npm)
+- Tests for the rules logic (currently just the in-browser checks in `model-demo.html`; now that
+  the project has npm via Vite, a real test runner like Vitest is an option)

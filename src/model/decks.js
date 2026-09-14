@@ -2,6 +2,12 @@
 // values here are placeholders for wiring up the engine end to end, not
 // tuned game balance.
 
+import { createAttackCard, createDefendCard, createBuffCard, createDebuffCard, STACKING } from "./cardTypes.js";
+import { DAMAGE_TYPE } from "./damageTypes.js";
+import { MODIFIER_MODE, energyRegen, meterSiphon, statModifier } from "./effects.js";
+import { shuffle } from "./util.js";
+import { exampleClassGuardian, exampleClassPyromancer } from "./data.js";
+
 const guardianDeckBlueprint = [
   { count: 4, make: () => createAttackCard({ name: "Shield Bash", damageType: DAMAGE_TYPE.PHYSICAL, value: 6 }) },
   { count: 3, make: () => createAttackCard({ name: "Heavy Slam", damageType: DAMAGE_TYPE.PHYSICAL, value: 9 }) },
@@ -67,7 +73,7 @@ const pyromancerDeckBlueprint = [
 ];
 
 // Build actual card instances from a blueprint (a list of { count, make }).
-function buildDeckFromBlueprint(blueprint) {
+export function buildDeckFromBlueprint(blueprint) {
   const deck = [];
   for (const entry of blueprint) {
     for (let i = 0; i < entry.count; i++) {
@@ -79,12 +85,12 @@ function buildDeckFromBlueprint(blueprint) {
 
 // classId -> blueprint, so the engine/UI can build a deck just from the class
 // the player or CPU picked.
-const DECK_BLUEPRINTS = {
+export const DECK_BLUEPRINTS = {
   [exampleClassGuardian.id]: guardianDeckBlueprint,
   [exampleClassPyromancer.id]: pyromancerDeckBlueprint,
 };
 
-function buildDeckForClass(classDef) {
+export function buildDeckForClass(classDef) {
   const blueprint = DECK_BLUEPRINTS[classDef.id];
   if (!blueprint) throw new Error(`No deck blueprint for class "${classDef.id}"`);
   return buildDeckFromBlueprint(blueprint);

@@ -13,13 +13,13 @@
 // know which card category played this match counts toward this synergy's
 // tier -- resolveSynergies below doesn't touch it directly, it just takes
 // whatever activeCounts the caller hands it.
-function createSynergy({ id, name, description, tiers, countsCategory }) {
+export function createSynergy({ id, name, description, tiers, countsCategory }) {
   return { id, name, description, tiers, countsCategory };
 }
 
 // Given how many pieces of a synergy are currently active (e.g. cards of that
 // synergy in play), return the highest tier reached, or null if none.
-function getActiveTier(synergy, activeCount) {
+export function getActiveTier(synergy, activeCount) {
   let best = null;
   for (const tier of synergy.tiers) {
     if (activeCount >= tier.count) {
@@ -32,7 +32,7 @@ function getActiveTier(synergy, activeCount) {
 // Resolve every synergy in a pool against a map of { synergyId: activeCount }
 // and return the flat list of effects granted by whichever tier each synergy
 // reached.
-function resolveSynergies(synergyPool, activeCounts) {
+export function resolveSynergies(synergyPool, activeCounts) {
   const effects = [];
   for (const synergy of synergyPool) {
     const tier = getActiveTier(synergy, activeCounts[synergy.id] ?? 0);

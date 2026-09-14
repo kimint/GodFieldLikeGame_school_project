@@ -20,11 +20,19 @@
 //   means "don't consume this on the first hit it blocks").
 // - CONDITIONAL and SUMMON effects are accepted but are currently no-ops.
 
+import { shuffle } from "./util.js";
+import { resolveSynergies } from "./synergies.js";
+import { EFFECT_KIND, MODIFIER_MODE } from "./effects.js";
+import { computeEffectiveStats } from "./classes.js";
+import { applyDefend, CARD_CATEGORY, STACKING } from "./cardTypes.js";
+import { RESIST_STAT } from "./damageTypes.js";
+import { buildDeckForClass } from "./decks.js";
+
 const HAND_SIZE = 5;
 
 // --- fighter state -----------------------------------------------------
 
-function createFighter(classDef, deck) {
+export function createFighter(classDef, deck) {
   return {
     classDef,
     hp: classDef.baseStats.hp,
@@ -69,7 +77,7 @@ function computeActiveSynergyEffects(fighter) {
   return resolveSynergies(pool, activeCounts);
 }
 
-function computeCurrentStats(fighter) {
+export function computeCurrentStats(fighter) {
   const synergyEffects = computeActiveSynergyEffects(fighter);
   const tempStatEffects = fighter.tempModifiers
     .map((m) => m.effect)
@@ -88,7 +96,7 @@ function currentUltimateRegen(fighter) {
   return regen;
 }
 
-function canUseUltimate(fighter) {
+export function canUseUltimate(fighter) {
   return fighter.ultimateMeter >= fighter.classDef.ultimate.cost;
 }
 
@@ -195,7 +203,7 @@ function regenAndDraw(fighter) {
 //   { kind: "ultimate" }
 //   { kind: "none" }        -- nothing available to play (empty hand)
 
-function createBattle(playerClass, cpuClass) {
+export function createBattle(playerClass, cpuClass) {
   const battle = {
     player: createFighter(playerClass, buildDeckForClass(playerClass)),
     cpu: createFighter(cpuClass, buildDeckForClass(cpuClass)),
@@ -214,18 +222,18 @@ function addLog(battle, message) {
   battle.log.unshift(message);
 }
 
-function isBattleOver(battle) {
+export function isBattleOver(battle) {
   return Boolean(battle.winner) || battle.draw;
 }
 
 // --- committing an action (without resolving it yet) ----------------------
 
-function cardAction(fighter, cardId) {
+export function cardAction(fighter, cardId) {
   const card = fighter.hand.find((c) => c.id === cardId);
   return card ? { kind: "card", card } : null;
 }
 
-function ultimateAction(fighter) {
+export function ultimateAction(fighter) {
   return canUseUltimate(fighter) ? { kind: "ultimate" } : null;
 }
 
@@ -322,7 +330,7 @@ function checkOutcome(battle) {
 
 // Commit the player's chosen action for this round, have the CPU
 // independently commit its own, then resolve both together.
-function playRound(battle, playerAction) {
+export function playRound(battle, playerAction) {
   if (isBattleOver(battle) || !playerAction) return;
 
   const cpuAction = chooseCpuAction(battle);
@@ -367,7 +375,7 @@ function describeEffect(effect) {
   }
 }
 
-function describeCard(card) {
+export function describeCard(card) {
   switch (card.category) {
     case CARD_CATEGORY.ATTACK:
       return `${card.damageType} ${card.value}`;

@@ -3,22 +3,24 @@
 // attack/defense cards in src/cards.js, but it is NOT wired into the playable
 // prototype (index.html) yet -- see model-demo.html for a standalone smoke test.
 
+import { MODIFIER_MODE } from "./effects.js";
+
 let modelCardIdCounter = 0;
 
-const CARD_CATEGORY = {
+export const CARD_CATEGORY = {
   ATTACK: "attack",
   DEFEND: "defend",
   BUFF: "buff",
   DEBUFF: "debuff",
 };
 
-const STACKING = {
+export const STACKING = {
   STACKABLE: "stackable",
   NONSTACKABLE: "nonstackable",
 };
 
 // Attack card: deals `value` damage of `damageType`.
-function createAttackCard({ name, damageType, value }) {
+export function createAttackCard({ name, damageType, value }) {
   return {
     id: ++modelCardIdCounter,
     category: CARD_CATEGORY.ATTACK,
@@ -29,7 +31,7 @@ function createAttackCard({ name, damageType, value }) {
 }
 
 // Defend card: reduces incoming damage of `damageType` for `duration` turns.
-function createDefendCard({ name, damageType, mode, amount, stacking, duration }) {
+export function createDefendCard({ name, damageType, mode, amount, stacking, duration }) {
   return {
     id: ++modelCardIdCounter,
     category: CARD_CATEGORY.DEFEND,
@@ -43,7 +45,7 @@ function createDefendCard({ name, damageType, mode, amount, stacking, duration }
 }
 
 // Buff card: grants one or more positive effects for `duration` turns.
-function createBuffCard({ name, effects, duration }) {
+export function createBuffCard({ name, effects, duration }) {
   return {
     id: ++modelCardIdCounter,
     category: CARD_CATEGORY.BUFF,
@@ -54,7 +56,7 @@ function createBuffCard({ name, effects, duration }) {
 }
 
 // Debuff card: grants one or more negative effects for `duration` turns.
-function createDebuffCard({ name, effects, duration }) {
+export function createDebuffCard({ name, effects, duration }) {
   return {
     id: ++modelCardIdCounter,
     category: CARD_CATEGORY.DEBUFF,
@@ -70,7 +72,7 @@ function createDebuffCard({ name, effects, duration }) {
 // "true" damage only gets blocked by a defend card that explicitly names
 // "true"). Stacking multiple simultaneous defend cards is intentionally not
 // modeled yet -- see docs/DESIGN.md.
-function applyDefend(attackCard, defendCard) {
+export function applyDefend(attackCard, defendCard) {
   if (!defendCard || defendCard.damageType !== attackCard.damageType) {
     return attackCard.value;
   }
