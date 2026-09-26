@@ -22,6 +22,8 @@ Then open the URL Vite prints (usually `http://localhost:5173`). Vite serves `in
 ```bash
 npm run build     # production build to dist/ (index.html + model-demo.html)
 npm run preview   # serve that production build locally
+npm run lint      # ESLint
+npm test          # Vitest (tests/)
 ```
 
 `legacy/` isn't part of the production build — its scripts are plain global `<script>` tags with
@@ -142,6 +144,18 @@ ultimate each get a small hand-authored SVG icon instead (`src/icons.js`):
   (see `docs/DESIGN.md`) — a per-class ultimate icon would be guessing at design that hasn't
   happened yet.
 
+### Card artwork and the card gallery
+
+The **Card gallery** button (top right of the class-select screen) lists every card in the
+catalog, filterable by category. A card can have its own artwork via the optional `image_url`
+column on the `cards` table (`supabase/migrations/*_card_images.sql`); cards without one keep
+showing their category icon, as does any card whose image fails to load. `image_url` can be:
+
+- a file in the public **`card-images`** Storage bucket (upload it in the Supabase dashboard,
+  then paste its public URL), or
+- a path served by the site itself, e.g. `/cards/shield_bash.png` for a file at
+  `public/cards/shield_bash.png`.
+
 ## File layout
 
 | Path | Purpose |
@@ -199,3 +213,4 @@ ultimate each get a small hand-authored SVG icon instead (`src/icons.js`):
 - Animations / sound effects
 - Tests for the rules logic (currently just the in-browser checks in `model-demo.html`; now that
   the project has npm via Vite, a real test runner like Vitest is an option)
+

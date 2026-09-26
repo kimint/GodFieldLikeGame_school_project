@@ -13,7 +13,7 @@ import {
   leaveMatch,
   watchMatch,
 } from "../online/matchApi.js";
-import { COLORS, TEXT, FONT_FAMILY, createButton } from "./theme.js";
+import { COLORS, TEXT, FONT_FAMILY, createButton, useRenderScale } from "./theme.js";
 
 export class LobbyScene extends Phaser.Scene {
   constructor() {
@@ -22,6 +22,7 @@ export class LobbyScene extends Phaser.Scene {
 
   // data: { mode: "create" | "join", playerClass, code? }
   create(data) {
+    useRenderScale(this);
     this.matchId = null;
     this.userId = null;
     this.starting = false;

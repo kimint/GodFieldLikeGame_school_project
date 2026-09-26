@@ -18,7 +18,7 @@ import {
 } from "../model/engine.js";
 import { allClasses } from "../model/catalog.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY, damageAccentColor } from "../phaserIcons.js";
-import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton } from "./theme.js";
+import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton, useRenderScale } from "./theme.js";
 
 const PANEL_Y = 50;
 const PANEL_W = 420;
@@ -95,6 +95,7 @@ export class BattleScene extends Phaser.Scene {
   // --- scene ---------------------------------------------------------------
 
   create(data) {
+    useRenderScale(this);
     this.battle = this.setupBattle(data);
 
     this.add
@@ -151,13 +152,11 @@ export class BattleScene extends Phaser.Scene {
 
     // Only scroll the log when the pointer is over it, so it doesn't hijack
     // wheel input over the rest of the page.
+    // pointer.x/y are canvas pixels, so convert them into the camera's
+    // (zoomed) 960x760 layout coordinates before comparing to the log's box.
     this.input.on("wheel", (pointer, _objects, _dx, dy) => {
-      if (
-        pointer.x < LOG_X ||
-        pointer.x > LOG_X + LOG_W ||
-        pointer.y < LOG_Y ||
-        pointer.y > LOG_Y + LOG_H
-      ) {
+      const { x, y } = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      if (x < LOG_X || x > LOG_X + LOG_W || y < LOG_Y || y > LOG_Y + LOG_H) {
         return;
       }
       this.scrollLog(Math.sign(dy));

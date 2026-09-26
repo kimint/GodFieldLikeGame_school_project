@@ -7,7 +7,9 @@
 import { cardIconMarkup, classIconMarkup, ultimateIconMarkup, DAMAGE_TYPE_ACCENT } from "./icons.js";
 import { CARD_CATEGORY } from "./model/cardTypes.js";
 
-const ICON_TEXTURE_SIZE = 64;
+// Rasterized well above the largest on-screen icon size (~30px) so icons stay
+// sharp once the camera is zoomed for HiDPI screens (see theme.js).
+const ICON_TEXTURE_SIZE = 128;
 
 export const CARD_ICON_KEY = {
   [CARD_CATEGORY.ATTACK]: "icon-card-attack",

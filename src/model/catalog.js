@@ -51,7 +51,13 @@ export function buildCatalog(rows, source = "unknown") {
       warn(`skipping card "${row.id}": unknown category "${row.category}"`);
       continue;
     }
-    cards.set(row.id, { id: row.id, name: row.name, category: row.category, props: row.props ?? {} });
+    cards.set(row.id, {
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      props: row.props ?? {},
+      imageUrl: row.image_url ?? null, // optional artwork; null = use the category icon
+    });
   }
 
   const poolByClass = new Map();
@@ -138,6 +144,24 @@ export function findClassById(id) {
   const classDef = getCatalog().classById.get(id);
   if (!classDef) throw new Error(`Unknown class "${id}"`);
   return classDef;
+}
+
+// Every card in the catalog (not just ones in a deck). Unordered -- callers
+// that display them should sort.
+export function allCards() {
+  return [...getCatalog().cards.values()];
+}
+
+// Which classes start with this card, and how many copies:
+// [{ classDef, copies }]. Used by the card gallery.
+export function deckEntriesForCard(cardId) {
+  const catalog = getCatalog();
+  const result = [];
+  for (const classDef of catalog.classes) {
+    const entry = (catalog.deckByClass.get(classDef.id) ?? []).find((e) => e.card.id === cardId);
+    if (entry) result.push({ classDef, copies: entry.copies });
+  }
+  return result;
 }
 
 // A fresh shuffled deck of card instances for a class.

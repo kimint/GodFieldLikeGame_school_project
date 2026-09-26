@@ -28,6 +28,35 @@ export const TEXT = {
 
 export const FONT_FAMILY = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 
+// --- Crisp rendering on high-DPI / scaled-up screens ----------------------
+//
+// Every scene lays itself out in a fixed 960x760 coordinate space. If the
+// canvas were also 960x760 pixels, Scale.FIT would stretch it up to fill the
+// window -- and on a Retina/HiDPI screen (devicePixelRatio 2+) that stretch
+// is what made text and icons look blurry. Instead the canvas is created
+// RENDER_SCALE times bigger and each scene's camera is zoomed by the same
+// factor (useRenderScale below), so all the layout code keeps using 960x760
+// coordinates while the actual pixels match the screen.
+
+export const GAME_WIDTH = 960;
+export const GAME_HEIGHT = 760;
+
+function computeRenderScale() {
+  const dpr = window.devicePixelRatio || 1;
+  // How much Scale.FIT will enlarge the 960x760 layout to fill the window.
+  const fitRatio = Math.max(1, Math.min(window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT));
+  // Capped at 3: beyond that the extra pixels aren't visible but cost memory.
+  return Phaser.Math.Clamp(Math.ceil(dpr * fitRatio), 1, 3);
+}
+
+export const RENDER_SCALE = computeRenderScale();
+
+// Call first thing in every scene's create(): zooms the camera so the
+// 960x760 layout fills the RENDER_SCALE-sized canvas, anchored top-left.
+export function useRenderScale(scene) {
+  scene.cameras.main.setOrigin(0, 0).setZoom(RENDER_SCALE);
+}
+
 // A filled rounded rectangle, its origin at (0,0) like every other Phaser
 // shape, with an interactive hit area covering the same rect -- the click
 // target for anything drawn with this (class cards, hand cards, buttons).
