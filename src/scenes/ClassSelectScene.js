@@ -3,7 +3,7 @@
 // BattleScene or an online match via LobbyScene.
 
 import Phaser from "phaser";
-import { ALL_CLASSES } from "../model/data.js";
+import { allClasses } from "../model/catalog.js";
 import { onlineAvailable } from "../online/matchApi.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY } from "../phaserIcons.js";
 import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton } from "./theme.js";
@@ -18,7 +18,7 @@ export class ClassSelectScene extends Phaser.Scene {
   }
 
   preload() {
-    preloadIcons(this, ALL_CLASSES);
+    preloadIcons(this, allClasses());
   }
 
   create() {
@@ -40,16 +40,17 @@ export class ClassSelectScene extends Phaser.Scene {
       .text(480, 134, "Choose your class", { fontFamily: FONT_FAMILY, fontSize: "16px", color: TEXT.muted })
       .setOrigin(0.5, 0);
 
-    const totalWidth = ALL_CLASSES.length * CARD_W + (ALL_CLASSES.length - 1) * CARD_GAP;
+    const classes = allClasses();
+    const totalWidth = classes.length * CARD_W + (classes.length - 1) * CARD_GAP;
     let x = 480 - totalWidth / 2;
     const y = 176;
 
     this.selectionOutlines = new Map(); // classId -> outline graphics
-    for (const classDef of ALL_CLASSES) {
+    for (const classDef of classes) {
       this.createClassCard(x, y, classDef);
       x += CARD_W + CARD_GAP;
     }
-    this.selectClass(ALL_CLASSES[0]);
+    this.selectClass(classes[0]);
 
     const buttonY = y + CARD_H + 36;
     createButton(this, 480 - 300, buttonY, 180, 44, "Play vs CPU", {

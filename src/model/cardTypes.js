@@ -66,6 +66,20 @@ export function createDebuffCard({ name, effects, duration }) {
   };
 }
 
+// One playable copy of a catalog card definition (a `cards` row: { id, name,
+// category, props }). Props are spread flat so an instance has the same shape
+// the create*Card helpers above produce; `id` is this copy's per-battle
+// number and `cardId` the catalog id it came from.
+export function createCardInstance(definition) {
+  return {
+    ...definition.props,
+    id: ++modelCardIdCounter,
+    cardId: definition.id,
+    category: definition.category,
+    name: definition.name,
+  };
+}
+
 // Resolve a defend card against an incoming attack card, returning the damage
 // that actually gets through. A defend card only applies to a matching
 // damageType (a "physical" defend does nothing against "magic" damage, and

@@ -1,13 +1,26 @@
 // Tiny in-browser smoke test for the data model in src/model/*. Renders
 // pass/fail lines to the page (model-demo.html) -- enough to prove the
-// pieces fit together, not a real test framework.
+// pieces fit together, not a real test framework. Runs against the local
+// catalog copy (catalogData.js), not Supabase.
 
 import { computeEffectiveStats } from "./classes.js";
-import { exampleClassGuardian, exampleAttackCard, exampleDefendCard } from "./data.js";
+import { useLocalCatalog, findClassById, buildDeckForClass } from "./catalog.js";
 import { resolveSynergies } from "./synergies.js";
 import { applyDefend, createDefendCard, createAttackCard, STACKING } from "./cardTypes.js";
 import { DAMAGE_TYPE } from "./damageTypes.js";
 import { MODIFIER_MODE } from "./effects.js";
+
+useLocalCatalog();
+const exampleClassGuardian = findClassById("guardian");
+const exampleAttackCard = createAttackCard({ name: "Slash", damageType: DAMAGE_TYPE.PHYSICAL, value: 10 });
+const exampleDefendCard = createDefendCard({
+  name: "Iron Wall",
+  damageType: DAMAGE_TYPE.PHYSICAL,
+  mode: MODIFIER_MODE.FLAT,
+  amount: 4,
+  stacking: STACKING.NONSTACKABLE,
+  duration: 1,
+});
 
 const results = [];
 
@@ -61,6 +74,14 @@ check("a 30% defend card reduces 10 physical to 7", dmgWithPercent === 7);
 const trueAttack = createAttackCard({ name: "Execute", damageType: DAMAGE_TYPE.TRUE, value: 8 });
 const dmgTrueVsPhysicalDefend = applyDefend(trueAttack, exampleDefendCard);
 check("a physical defend card does not block true damage", dmgTrueVsPhysicalDefend === 8);
+
+// 8. Decks are built from the catalog's class_deck_cards rows.
+const guardianDeck = buildDeckForClass(exampleClassGuardian);
+check("Guardian's catalog deck has 18 cards", guardianDeck.length === 18);
+check(
+  "catalog card instances carry their catalog id and props",
+  guardianDeck.some((c) => c.cardId === "iron_wall" && c.category === "defend" && c.amount === 5)
+);
 
 // Render results to the page.
 const list = document.getElementById("results");
