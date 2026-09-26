@@ -6,7 +6,7 @@ import Phaser from "phaser";
 import { allClasses } from "../model/catalog.js";
 import { onlineAvailable } from "../online/matchApi.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY } from "../phaserIcons.js";
-import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton } from "./theme.js";
+import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton, useRenderScale } from "./theme.js";
 
 const CARD_W = 260;
 const CARD_H = 210;
@@ -22,6 +22,7 @@ export class ClassSelectScene extends Phaser.Scene {
   }
 
   create() {
+    useRenderScale(this);
     this.add
       .text(480, 32, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "28px", fontStyle: "700", color: TEXT.white })
       .setOrigin(0.5, 0);
