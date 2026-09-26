@@ -16,7 +16,7 @@ import {
   isBattleOver,
   fighterName,
 } from "../model/engine.js";
-import { ALL_CLASSES } from "../model/data.js";
+import { allClasses } from "../model/catalog.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY, damageAccentColor } from "../phaserIcons.js";
 import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton } from "./theme.js";
 
@@ -49,14 +49,14 @@ export class BattleScene extends Phaser.Scene {
   }
 
   preload() {
-    preloadIcons(this, ALL_CLASSES);
+    preloadIcons(this, allClasses());
   }
 
   // --- battle source (overridden by OnlineBattleScene) ---------------------
 
   setupBattle(data) {
     const playerClass = data.playerClass;
-    const cpuClass = ALL_CLASSES.find((c) => c.id !== playerClass.id) ?? playerClass;
+    const cpuClass = allClasses().find((c) => c.id !== playerClass.id) ?? playerClass;
     return createBattle(playerClass, cpuClass);
   }
 

@@ -5,14 +5,14 @@
 //
 // A live fighter holds its full class definition and a Set, neither of which
 // survive JSON.stringify, so a stored fighter keeps just the class id (looked
-// back up in data.js) and an array.
+// back up in catalog.js) and an array.
 //
 // "Private" fighter data -- hand, deck, discard -- is only included when
 // asked for. The server's own copy of the battle has it; the public copy both
 // players can read has card counts instead, so neither side's client ever
 // receives the other's cards.
 
-import { findClassById } from "./data.js";
+import { findClassById } from "./catalog.js";
 
 export function serializeFighter(fighter, { includePrivate = false } = {}) {
   const data = {

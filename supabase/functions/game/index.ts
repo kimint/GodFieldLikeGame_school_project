@@ -16,7 +16,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createBattle, cardAction, ultimateAction, resolveRound, isBattleOver } from "../../../src/model/engine.js";
-import { findClassById } from "../../../src/model/data.js";
+import { findClassById, loadCatalog } from "../../../src/model/catalog.js";
 import { serializeBattle, deserializeBattle, publicFighters } from "../../../src/model/serialize.js";
 
 const corsHeaders = {
@@ -32,6 +32,33 @@ const CODE_LENGTH = 5;
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+
+// Classes/cards come from the catalog tables (see src/model/catalog.js).
+// Each function instance caches them and re-reads after CATALOG_TTL_MS, so a
+// balance change made in the dashboard reaches new matches within a few
+// minutes without a redeploy. Matches already running keep the cards they
+// were dealt -- those are copied into match_secrets.
+const CATALOG_TTL_MS = 5 * 60 * 1000;
+let catalogLoad: Promise<unknown> | null = null;
+let catalogLoadedAt = 0;
+let haveCatalog = false;
+
+function ensureCatalog() {
+  if (!catalogLoad || Date.now() - catalogLoadedAt > CATALOG_TTL_MS) {
+    catalogLoadedAt = Date.now();
+    catalogLoad = loadCatalog(admin).then(
+      () => {
+        haveCatalog = true;
+      },
+      (err) => {
+        catalogLoad = null; // retry on the next request instead of caching the failure
+        if (!haveCatalog) throw err;
+        console.error("Catalog refresh failed, keeping the previous one:", err); // a stale catalog beats an outage
+      }
+    );
+  }
+  return catalogLoad;
+}
 
 class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -252,6 +279,7 @@ Deno.serve(async (req) => {
 
   try {
     const userId = await authenticate(req);
+    await ensureCatalog();
     const body = await req.json();
     switch (body?.op) {
       case "create":

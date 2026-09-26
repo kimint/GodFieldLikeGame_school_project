@@ -3,15 +3,13 @@
 // can only READ -- its match row and its own hand, as the RLS policies in
 // supabase/migrations/*_online_pvp.sql allow.
 //
-// Sign-in is anonymous (no account needed), and the session lives in
-// sessionStorage rather than localStorage, so every browser tab is its own
-// player -- two tabs on one machine can play each other for testing.
+// Sign-in is anonymous (no account needed), one player per browser tab --
+// see supabaseClient.js.
 
-import { createClient } from "@supabase/supabase-js";
 import { deserializeFighter } from "../model/serialize.js";
+import { supabase, onlineAvailable } from "./supabaseClient.js";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+export { onlineAvailable };
 
 // Realtime is the fast path; this poll only catches anything it missed, so it
 // can be slow. Everything that polls first asks for a few tiny columns
@@ -19,12 +17,6 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 // Supabase's free plan caps egress, and the full row carries the whole battle
 // log.
 const POLL_INTERVAL_MS = 15000;
-
-export const onlineAvailable = Boolean(SUPABASE_URL && SUPABASE_KEY);
-
-const supabase = onlineAvailable
-  ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { storage: window.sessionStorage } })
-  : null;
 
 // Returns the signed-in user's id, signing in anonymously first if needed.
 export async function ensureSignedIn() {

@@ -88,6 +88,28 @@ The same `src/model/` engine runs on the server instead of in the browser:
 - `.env` — the project URL and *publishable* key. Both are public by design and committed.
   Never put the secret / service_role key there.
 
+### Game catalog (classes, synergies, cards)
+
+Classes, synergies, cards, and each class's deck live in Supabase tables (`classes`, `synergies`,
+`class_synergies`, `cards`, `class_deck_cards`, see `supabase/migrations/*_game_catalog.sql`),
+readable by anyone and writable only from the dashboard / service role.
+`src/model/catalog.js` loads them into the engine: the browser once at startup (falling back to
+the bundled `src/model/catalogData.js` if Supabase can't be reached, so vs-CPU still works
+offline), the Edge Function per instance (re-read every 5 minutes).
+
+- **Tweaking numbers / adding cards or classes**: edit the rows in the Table Editor. No redeploy.
+  Matches already in progress keep the cards they were dealt.
+- **New card attributes**: put them in `cards.props` (jsonb). Common fields are columns;
+  anything category-specific is JSON, so it doesn't need a migration.
+- **Ids are permanent** (`shield_bash`, `guardian`): rename with `name`, never change an `id`.
+- **Changing the table shape**: always a new file in `supabase/migrations/`, never by hand in
+  the dashboard. For renames/removals: add the new column → ship code that uses it → drop the
+  old one.
+- Older code skips card categories it doesn't know and ignores unknown effect kinds / stats, so
+  adding new kinds of data first doesn't break the running game.
+- `catalogData.js` does not update itself from the database. `npm run catalog:sql` turns it into
+  upsert SQL (that's how `*_seed_game_catalog.sql` was made).
+
 After changing anything under `supabase/` (or `src/model/`, which the function bundles), push it
 from the repo root, logged in with `npx supabase login` and linked with
 `npx supabase link --project-ref vygltqnmontwxyyeyfyb`:
@@ -152,8 +174,8 @@ ultimate each get a small hand-authored SVG icon instead (`src/icons.js`):
 | `cardTypes.js` | The 4 card categories (attack/defend/buff/debuff) and defend-vs-attack resolution |
 | `synergies.js` | Tiered synergy definitions and resolution |
 | `classes.js` | Class definitions and effective-stat calculation |
-| `data.js` | The two example classes/synergies, the `ALL_CLASSES` list, and some example cards |
-| `decks.js` | Deck blueprints for the two example classes (used by the actual game) |
+| `catalog.js` | Loads classes/synergies/cards (Supabase or local copy); `findClassById`, `allClasses`, `buildDeckForClass` |
+| `catalogData.js` | Local copy of the catalog rows: offline fallback and the source for `npm run catalog:sql` |
 | `engine.js` | The round loop: simultaneous card/ultimate resolution, damage/effects, a simple CPU |
 | `serialize.js` | Battle state ↔ plain JSON, and the public (no hands/decks) view of it, for online PvP |
 | `demo.js` | The assertions rendered by `model-demo.html` |

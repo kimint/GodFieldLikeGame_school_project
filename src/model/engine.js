@@ -28,7 +28,7 @@ import { EFFECT_KIND, MODIFIER_MODE } from "./effects.js";
 import { computeEffectiveStats } from "./classes.js";
 import { applyDefend, CARD_CATEGORY, STACKING } from "./cardTypes.js";
 import { RESIST_STAT } from "./damageTypes.js";
-import { buildDeckForClass } from "./decks.js";
+import { buildDeckForClass } from "./catalog.js";
 
 const HAND_SIZE = 5;
 
@@ -159,7 +159,7 @@ function resolveStatusEffects(actor, target, card) {
 // this too, even though their actual effect is resolved later (see
 // applyDamagePhase) so that both sides' attacks use post-setup state.
 function commitCardHousekeeping(actor, card) {
-  actor.cardsPlayedByCategory[card.category] += 1;
+  actor.cardsPlayedByCategory[card.category] = (actor.cardsPlayedByCategory[card.category] ?? 0) + 1;
   const index = actor.hand.findIndex((c) => c.id === card.id);
   if (index !== -1) actor.hand.splice(index, 1);
   actor.discard.push(card);
