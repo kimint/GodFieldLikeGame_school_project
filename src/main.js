@@ -12,6 +12,7 @@ import { ClassSelectScene } from "./scenes/ClassSelectScene.js";
 import { BattleScene } from "./scenes/BattleScene.js";
 import { LobbyScene } from "./scenes/LobbyScene.js";
 import { OnlineBattleScene } from "./scenes/OnlineBattleScene.js";
+import { CardGalleryScene } from "./scenes/CardGalleryScene.js";
 import { COLORS, GAME_WIDTH, GAME_HEIGHT, RENDER_SCALE } from "./scenes/theme.js";
 import { loadCatalog, useLocalCatalog } from "./model/catalog.js";
 import { supabase, onlineAvailable } from "./online/supabaseClient.js";
@@ -56,6 +57,6 @@ loadGameCatalog().then(() => {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [ClassSelectScene, BattleScene, LobbyScene, OnlineBattleScene],
+    scene: [ClassSelectScene, BattleScene, LobbyScene, OnlineBattleScene, CardGalleryScene],
   });
 });

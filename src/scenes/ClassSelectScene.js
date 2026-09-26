@@ -1,6 +1,7 @@
 // Class-select screen: one card per playable class from src/model/data.js.
 // Clicking a card selects that class; the buttons underneath start a vs-CPU
-// BattleScene or an online match via LobbyScene.
+// BattleScene or an online match via LobbyScene, and the top-right button
+// opens the CardGalleryScene.
 
 import Phaser from "phaser";
 import { allClasses } from "../model/catalog.js";
@@ -26,6 +27,12 @@ export class ClassSelectScene extends Phaser.Scene {
     this.add
       .text(480, 32, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "28px", fontStyle: "700", color: TEXT.white })
       .setOrigin(0.5, 0);
+
+    createButton(this, 960 - 30 - 130, 24, 130, 34, "Card gallery", {
+      color: COLORS.restart,
+      hoverColor: COLORS.restartHover,
+      onClick: () => this.scene.start("CardGalleryScene"),
+    });
 
     this.add
       .text(
