@@ -6,7 +6,15 @@
 
 import { BattleScene } from "./BattleScene.js";
 import { isBattleOver } from "../model/engine.js";
-import { buildBattleView, fetchHand, fetchMatch, leaveMatch, submitAction, watchMatch } from "../online/matchApi.js";
+import {
+  buildBattleView,
+  fetchHand,
+  fetchMatch,
+  fetchMatchVersion,
+  leaveMatch,
+  submitAction,
+  watchMatch,
+} from "../online/matchApi.js";
 
 export class OnlineBattleScene extends BattleScene {
   constructor() {
@@ -21,10 +29,13 @@ export class OnlineBattleScene extends BattleScene {
     this.pendingPick = null; // name of what we just locked in, until the round resolves
     this.errorMessage = null;
     this.refreshSeq = 0;
-    this.lastSignature = signature(data.match, data.hand);
+    this.version = versionOf(data.match);
+    this.mySide = data.match.p1 === this.userId ? "p1" : "p2";
 
     this.stopWatching = watchMatch(this.matchId, () => this.refresh());
     this.events.once("shutdown", () => this.stopWatching());
+    // A finished match can't change any more, so stop listening for updates.
+    if (data.match.status === "finished") this.stopWatching();
 
     return buildBattleView(data.match, data.hand, this.userId);
   }
@@ -84,30 +95,50 @@ export class OnlineBattleScene extends BattleScene {
     }`;
   }
 
-  // Pull the latest match + hand and redraw if anything changed. Called by
-  // Realtime events, the fallback poll, and after our own submit; only the
-  // newest call's result is applied so a slow response can't roll the screen
-  // back.
+  // Check for changes and redraw if there are any. Called by Realtime events,
+  // the fallback poll, and after our own submit. Asks for the tiny "version"
+  // columns first and only pulls the full row + hand when a round actually
+  // resolved (or the match ended). Only the newest call's result is applied,
+  // so a slow response can't roll the screen back.
   async refresh() {
     const seq = ++this.refreshSeq;
+    const isStale = () => seq !== this.refreshSeq || !this.scene.isActive();
+
+    let version;
+    try {
+      version = await fetchMatchVersion(this.matchId);
+    } catch {
+      return; // transient network error; the next poll will try again
+    }
+    if (isStale()) return;
+
+    if (version.updated_at === this.version.updated_at && version.status === this.version.status) {
+      // At most someone locked in a move -- patch the flags, no full fetch.
+      if (version.p1_ready === this.version.p1_ready && version.p2_ready === this.version.p2_ready) return;
+      this.version = version;
+      this.battle.myReady = version[`${this.mySide}_ready`];
+      this.battle.opponentReady = version[this.mySide === "p1" ? "p2_ready" : "p1_ready"];
+      this.render();
+      return;
+    }
+
     let match, hand;
     try {
       [match, hand] = await Promise.all([fetchMatch(this.matchId), fetchHand(this.matchId, this.userId)]);
     } catch {
-      return; // transient network error; the next poll will try again
+      return;
     }
-    if (seq !== this.refreshSeq || !this.scene.isActive()) return;
+    if (isStale()) return;
 
-    const sig = signature(match, hand);
-    if (sig === this.lastSignature) return;
-    this.lastSignature = sig;
-
+    this.version = versionOf(match);
     this.battle = buildBattleView(match, hand, this.userId);
     if (!this.battle.myReady && !this.submitting) this.pendingPick = null;
+    if (match.status === "finished") this.stopWatching();
     this.render();
   }
 }
 
-function signature(match, hand) {
-  return [match.updated_at, match.status, match.p1_ready, match.p2_ready, hand.map((c) => c.id).join(",")].join("|");
+function versionOf(match) {
+  const { updated_at, status, round, p1_ready, p2_ready } = match;
+  return { updated_at, status, round, p1_ready, p2_ready };
 }

@@ -3,7 +3,16 @@
 // OnlineBattleScene. See src/online/matchApi.js.
 
 import Phaser from "phaser";
-import { createMatch, ensureSignedIn, fetchHand, fetchMatch, joinMatch, leaveMatch, watchMatch } from "../online/matchApi.js";
+import {
+  createMatch,
+  ensureSignedIn,
+  fetchHand,
+  fetchMatch,
+  fetchMatchVersion,
+  joinMatch,
+  leaveMatch,
+  watchMatch,
+} from "../online/matchApi.js";
 import { COLORS, TEXT, FONT_FAMILY, createButton } from "./theme.js";
 
 export class LobbyScene extends Phaser.Scene {
@@ -84,26 +93,35 @@ export class LobbyScene extends Phaser.Scene {
     });
   }
 
-  // The battle is ready once the server has written the public fighters.
+  // The battle is ready once the server has set it up, which moves the
+  // match's round from 0 to 1. Polls only the tiny version columns until
+  // then, and fetches the full row + hand once.
   async checkStarted() {
     if (this.starting) return;
-    let match;
+    let version;
     try {
-      match = await fetchMatch(this.matchId);
+      version = await fetchMatchVersion(this.matchId);
     } catch {
       return; // try again on the next event/poll
     }
     if (this.starting || !this.scene.isActive()) return;
 
-    if (match.status === "finished" && !match.fighters) {
-      this.statusText.setText("This room was closed.");
+    if (version.round === 0) {
+      if (version.status === "finished") {
+        this.statusText.setText("This room was closed.");
+        this.stopWatching?.();
+      }
       return;
     }
-    if (!match.fighters) return;
 
     this.starting = true;
-    const hand = await fetchHand(this.matchId, this.userId);
-    this.scene.start("OnlineBattleScene", { matchId: this.matchId, userId: this.userId, match, hand });
+    try {
+      const [match, hand] = await Promise.all([fetchMatch(this.matchId), fetchHand(this.matchId, this.userId)]);
+      if (!this.scene.isActive()) return;
+      this.scene.start("OnlineBattleScene", { matchId: this.matchId, userId: this.userId, match, hand });
+    } catch {
+      this.starting = false; // try again on the next event/poll
+    }
   }
 
   onBack() {

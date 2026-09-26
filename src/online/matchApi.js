@@ -13,8 +13,12 @@ import { deserializeFighter } from "../model/serialize.js";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Realtime is the fast path; this poll only catches anything it missed.
-const POLL_INTERVAL_MS = 3000;
+// Realtime is the fast path; this poll only catches anything it missed, so it
+// can be slow. Everything that polls first asks for a few tiny columns
+// (fetchMatchVersion) and only pulls the full row + hand when those changed --
+// Supabase's free plan caps egress, and the full row carries the whole battle
+// log.
+const POLL_INTERVAL_MS = 15000;
 
 export const onlineAvailable = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
@@ -68,6 +72,21 @@ export async function fetchMatch(matchId) {
   return data;
 }
 
+// Just enough of a match row to tell whether anything changed:
+// - updated_at moves whenever a round resolves, the battle starts, or
+//   someone leaves (and hands are always written before it moves),
+// - the ready flags flip without touching updated_at,
+// - round goes 0 -> 1 when the server finishes setting up the battle.
+export async function fetchMatchVersion(matchId) {
+  const { data, error } = await supabase
+    .from("matches")
+    .select("updated_at, status, round, p1_ready, p2_ready")
+    .eq("id", matchId)
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
 export async function fetchHand(matchId, userId) {
   const { data, error } = await supabase
     .from("match_hands")
@@ -80,7 +99,9 @@ export async function fetchHand(matchId, userId) {
 }
 
 // Call onChange() whenever the match or this player's hand might have
-// changed. Returns a function that stops watching.
+// changed. The fallback poll skips while the tab is in the background and
+// catches up as soon as it's visible again. Returns a function that stops
+// watching (safe to call more than once).
 export function watchMatch(matchId, onChange) {
   const channel = supabase
     .channel(`match:${matchId}`)
@@ -89,10 +110,19 @@ export function watchMatch(matchId, onChange) {
     .subscribe((status) => {
       if (status === "SUBSCRIBED") onChange();
     });
-  const timer = setInterval(onChange, POLL_INTERVAL_MS);
 
+  const pollIfVisible = () => {
+    if (!document.hidden) onChange();
+  };
+  const timer = setInterval(pollIfVisible, POLL_INTERVAL_MS);
+  document.addEventListener("visibilitychange", pollIfVisible);
+
+  let stopped = false;
   return () => {
+    if (stopped) return;
+    stopped = true;
     clearInterval(timer);
+    document.removeEventListener("visibilitychange", pollIfVisible);
     supabase.removeChannel(channel);
   };
 }
