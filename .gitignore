@@ -13,3 +13,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Env overrides (the committed .env only holds public Supabase values)
+.env.local
+.env.*.local

@@ -14,8 +14,9 @@ import {
   playRound,
   describeCard,
   isBattleOver,
+  fighterName,
 } from "../model/engine.js";
-import { ALL_CLASSES } from "./ClassSelectScene.js";
+import { ALL_CLASSES } from "../model/data.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY, damageAccentColor } from "../phaserIcons.js";
 import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton } from "./theme.js";
 
@@ -38,19 +39,63 @@ const LOG_H = 200;
 const LOG_LINE_HEIGHT = 20;
 const LOG_VISIBLE_LINES = Math.floor(LOG_H / LOG_LINE_HEIGHT);
 
+// vs-CPU battle. OnlineBattleScene (src/scenes/OnlineBattleScene.js) reuses
+// all of the drawing below and only overrides the hooks in the "battle
+// source" section: where the battle comes from, what a click does, and the
+// status line.
 export class BattleScene extends Phaser.Scene {
-  constructor() {
-    super("BattleScene");
+  constructor(key = "BattleScene") {
+    super(key);
   }
 
   preload() {
     preloadIcons(this, ALL_CLASSES);
   }
 
-  create(data) {
+  // --- battle source (overridden by OnlineBattleScene) ---------------------
+
+  setupBattle(data) {
     const playerClass = data.playerClass;
     const cpuClass = ALL_CLASSES.find((c) => c.id !== playerClass.id) ?? playerClass;
-    this.battle = createBattle(playerClass, cpuClass);
+    return createBattle(playerClass, cpuClass);
+  }
+
+  get playerLabel() {
+    return "Player";
+  }
+
+  get opponentLabel() {
+    return "CPU";
+  }
+
+  get leaveLabel() {
+    return "Restart";
+  }
+
+  // Whether the hand/ultimate should take clicks right now.
+  canAct() {
+    return !isBattleOver(this.battle);
+  }
+
+  commitAction(action) {
+    playRound(this.battle, action);
+    this.render();
+  }
+
+  onLeave() {
+    this.scene.start("ClassSelectScene");
+  }
+
+  statusMessage() {
+    if (this.battle.winner) return `${fighterName(this.battle.winner)} wins! Press "Restart" to play again.`;
+    if (this.battle.draw) return `Draw! Press "Restart" to play again.`;
+    return `Round ${this.battle.round} — pick a card. The CPU is choosing at the same time.`;
+  }
+
+  // --- scene ---------------------------------------------------------------
+
+  create(data) {
+    this.battle = this.setupBattle(data);
 
     this.add
       .text(480, 14, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "20px", fontStyle: "700", color: TEXT.white })
@@ -76,10 +121,10 @@ export class BattleScene extends Phaser.Scene {
     });
     this.ultimateButton = ultimate;
 
-    createButton(this, 528, BUTTON_ROW_Y, 110, 40, "Restart", {
+    createButton(this, 528, BUTTON_ROW_Y, 110, 40, this.leaveLabel, {
       color: COLORS.restart,
       hoverColor: COLORS.restartHover,
-      onClick: () => this.scene.start("ClassSelectScene"),
+      onClick: () => this.onLeave(),
     });
 
     this.add
@@ -142,38 +187,29 @@ export class BattleScene extends Phaser.Scene {
   }
 
   onCardClick(cardId) {
-    if (isBattleOver(this.battle)) return;
+    if (!this.canAct()) return;
     const action = cardAction(this.battle.player, cardId);
     if (!action) return;
-    playRound(this.battle, action);
-    this.render();
+    this.commitAction(action);
   }
 
   onUltimateClick() {
-    if (isBattleOver(this.battle)) return;
+    if (!this.canAct()) return;
     const action = ultimateAction(this.battle.player);
     if (!action) return;
-    playRound(this.battle, action);
-    this.render();
+    this.commitAction(action);
   }
 
   render() {
-    const over = isBattleOver(this.battle);
+    const locked = !this.canAct();
 
-    this.renderFighterPanel(this.cpuPanel, CPU_X, this.battle.cpu, "CPU");
-    this.renderFighterPanel(this.playerPanel, PLAYER_X, this.battle.player, "Player");
-    this.renderHand(over);
+    this.renderFighterPanel(this.cpuPanel, CPU_X, this.battle.cpu, this.opponentLabel);
+    this.renderFighterPanel(this.playerPanel, PLAYER_X, this.battle.player, this.playerLabel);
+    this.renderHand(locked);
     this.renderLog();
 
-    if (this.battle.winner) {
-      this.statusText.setText(`${this.battle.winner.classDef.name} wins! Press "Restart" to play again.`);
-    } else if (this.battle.draw) {
-      this.statusText.setText(`Draw! Press "Restart" to play again.`);
-    } else {
-      this.statusText.setText(`Round ${this.battle.round} — pick a card. The CPU is choosing at the same time.`);
-    }
-
-    this.ultimateButton.setEnabled(!over && canUseUltimate(this.battle.player));
+    this.statusText.setText(this.statusMessage());
+    this.ultimateButton.setEnabled(!locked && canUseUltimate(this.battle.player));
   }
 
   renderFighterPanel(container, x, fighter, label) {
@@ -251,7 +287,7 @@ export class BattleScene extends Phaser.Scene {
     );
   }
 
-  renderHand(over) {
+  renderHand(locked) {
     this.handContainer.removeAll(true);
     const cards = this.battle.player.hand;
     const totalW = cards.length * CARD_W + Math.max(0, cards.length - 1) * CARD_GAP;
@@ -305,7 +341,7 @@ export class BattleScene extends Phaser.Scene {
           .setAlpha(0.9)
       );
 
-      if (!over) {
+      if (!locked) {
         bg.on("pointerover", () => this.tweens.add({ targets: cardContainer, y: -6, duration: 100 }));
         bg.on("pointerout", () => this.tweens.add({ targets: cardContainer, y: 0, duration: 100 }));
         bg.on("pointerdown", () => this.onCardClick(card.id));

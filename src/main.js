@@ -5,6 +5,8 @@
 import Phaser from "phaser";
 import { ClassSelectScene } from "./scenes/ClassSelectScene.js";
 import { BattleScene } from "./scenes/BattleScene.js";
+import { LobbyScene } from "./scenes/LobbyScene.js";
+import { OnlineBattleScene } from "./scenes/OnlineBattleScene.js";
 import { COLORS } from "./scenes/theme.js";
 
 new Phaser.Game({
@@ -17,5 +19,5 @@ new Phaser.Game({
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [ClassSelectScene, BattleScene],
+  scene: [ClassSelectScene, BattleScene, LobbyScene, OnlineBattleScene],
 });

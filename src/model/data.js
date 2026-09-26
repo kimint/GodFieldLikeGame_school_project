@@ -93,3 +93,14 @@ export const exampleDebuffCard = createDebuffCard({
   effects: [meterSiphon(10)],
   duration: 1,
 });
+
+// Every playable class, in the order the class-select screen shows them.
+// Also how serialized battles (src/model/serialize.js) get from a stored
+// class id back to the full class definition.
+export const ALL_CLASSES = [exampleClassGuardian, exampleClassPyromancer];
+
+export function findClassById(id) {
+  const classDef = ALL_CLASSES.find((c) => c.id === id);
+  if (!classDef) throw new Error(`Unknown class "${id}"`);
+  return classDef;
+}

@@ -1,12 +1,12 @@
 // Class-select screen: one card per playable class from src/model/data.js.
-// Picking one starts BattleScene with that class.
+// Clicking a card selects that class; the buttons underneath start a vs-CPU
+// BattleScene or an online match via LobbyScene.
 
 import Phaser from "phaser";
-import { exampleClassGuardian, exampleClassPyromancer } from "../model/data.js";
+import { ALL_CLASSES } from "../model/data.js";
+import { onlineAvailable } from "../online/matchApi.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY } from "../phaserIcons.js";
-import { COLORS, TEXT, FONT_FAMILY, roundedRect } from "./theme.js";
-
-export const ALL_CLASSES = [exampleClassGuardian, exampleClassPyromancer];
+import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton } from "./theme.js";
 
 const CARD_W = 260;
 const CARD_H = 210;
@@ -31,7 +31,7 @@ export class ClassSelectScene extends Phaser.Scene {
         480,
         72,
         "Class-based card battle: attack / defend / buff / debuff, synergies, and an ultimate meter.\n" +
-          "Every round you and the CPU pick a card at the same time, then both resolve together.",
+          "Every round both sides pick a card at the same time, then both resolve together.",
         { fontFamily: FONT_FAMILY, fontSize: "13px", color: TEXT.muted, align: "center", wordWrap: { width: 640 } }
       )
       .setOrigin(0.5, 0);
@@ -44,10 +44,52 @@ export class ClassSelectScene extends Phaser.Scene {
     let x = 480 - totalWidth / 2;
     const y = 176;
 
+    this.selectionOutlines = new Map(); // classId -> outline graphics
     for (const classDef of ALL_CLASSES) {
       this.createClassCard(x, y, classDef);
       x += CARD_W + CARD_GAP;
     }
+    this.selectClass(ALL_CLASSES[0]);
+
+    const buttonY = y + CARD_H + 36;
+    createButton(this, 480 - 300, buttonY, 180, 44, "Play vs CPU", {
+      color: COLORS.restart,
+      hoverColor: COLORS.restartHover,
+      onClick: () => this.scene.start("BattleScene", { playerClass: this.selectedClass }),
+    });
+    const create = createButton(this, 480 - 90, buttonY, 180, 44, "Create online room", {
+      color: COLORS.ultimate,
+      hoverColor: COLORS.ultimateHover,
+      onClick: () => this.scene.start("LobbyScene", { mode: "create", playerClass: this.selectedClass }),
+    });
+    const join = createButton(this, 480 + 120, buttonY, 180, 44, "Join with code", {
+      color: COLORS.ultimate,
+      hoverColor: COLORS.ultimateHover,
+      onClick: () => this.onJoinClick(),
+    });
+
+    if (!onlineAvailable) {
+      create.setEnabled(false);
+      join.setEnabled(false);
+      this.add
+        .text(480, buttonY + 56, "Online play is off: VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY aren't set (see .env).", {
+          fontFamily: FONT_FAMILY,
+          fontSize: "12px",
+          color: TEXT.muted,
+        })
+        .setOrigin(0.5, 0);
+    }
+  }
+
+  selectClass(classDef) {
+    this.selectedClass = classDef;
+    for (const [id, outline] of this.selectionOutlines) outline.setVisible(id === classDef.id);
+  }
+
+  onJoinClick() {
+    const code = window.prompt("Enter the room code your friend sent you:");
+    if (!code || !code.trim()) return;
+    this.scene.start("LobbyScene", { mode: "join", code: code.trim(), playerClass: this.selectedClass });
   }
 
   createClassCard(x, y, classDef) {
@@ -55,6 +97,12 @@ export class ClassSelectScene extends Phaser.Scene {
 
     const bg = roundedRect(this, CARD_W, CARD_H, COLORS.panel, 12);
     container.add(bg);
+
+    const outline = this.add.graphics();
+    outline.lineStyle(3, COLORS.ultimate, 1);
+    outline.strokeRoundedRect(0, 0, CARD_W, CARD_H, 12);
+    container.add(outline);
+    this.selectionOutlines.set(classDef.id, outline);
 
     let textX = 16;
     const iconKey = classIconKey(classDef.id);
@@ -100,6 +148,6 @@ export class ClassSelectScene extends Phaser.Scene {
 
     bg.on("pointerover", () => this.tweens.add({ targets: container, y: y - 4, duration: 100 }));
     bg.on("pointerout", () => this.tweens.add({ targets: container, y, duration: 100 }));
-    bg.on("pointerdown", () => this.scene.start("BattleScene", { playerClass: classDef }));
+    bg.on("pointerdown", () => this.selectClass(classDef));
   }
 }

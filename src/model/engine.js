@@ -5,11 +5,13 @@
 //
 // Turns are simultaneous: each round, the player commits one action and the
 // CPU independently picks its own (from state alone -- chooseCpuAction never
-// looks at the player's chosen action), then both resolve together. This is
-// PvE-only for now (docs/DESIGN.md's "both players act at the same time" for
-// real PvP still needs a server so neither side can see the other's pending
-// move; here the CPU just genuinely doesn't look, which is enough for a
-// single browser tab -- see "Architecture implications" in docs/DESIGN.md).
+// looks at the player's chosen action), then both resolve together.
+//
+// The same engine also runs online PvP, server-side in the Supabase Edge
+// Function (supabase/functions/game/): there the two sides are two humans,
+// still stored in the `player` / `cpu` slots (player 1 / player 2), and
+// resolveRound is called with both humans' actions instead of going through
+// playRound's CPU. See "Online PvP" in README.md.
 //
 // Other simplifications vs. docs/DESIGN.md (kept deliberately, not silently
 // dropped):
@@ -32,9 +34,12 @@ const HAND_SIZE = 5;
 
 // --- fighter state -----------------------------------------------------
 
-export function createFighter(classDef, deck) {
+// `label` is an optional display name for the battle log -- used online when
+// both players pick the same class, so the log can tell them apart.
+export function createFighter(classDef, deck, label = null) {
   return {
     classDef,
+    label,
     hp: classDef.baseStats.hp,
     maxHp: classDef.baseStats.hp,
     deck,
@@ -47,6 +52,10 @@ export function createFighter(classDef, deck) {
     disabledSynergies: new Set(),
     disabledSynergyTimers: {}, // synergyId -> remaining turns
   };
+}
+
+export function fighterName(fighter) {
+  return fighter.label ?? fighter.classDef.name;
 }
 
 function drawCard(fighter) {
@@ -203,10 +212,10 @@ function regenAndDraw(fighter) {
 //   { kind: "ultimate" }
 //   { kind: "none" }        -- nothing available to play (empty hand)
 
-export function createBattle(playerClass, cpuClass) {
+export function createBattle(playerClass, cpuClass, { playerLabel = null, cpuLabel = null } = {}) {
   const battle = {
-    player: createFighter(playerClass, buildDeckForClass(playerClass)),
-    cpu: createFighter(cpuClass, buildDeckForClass(cpuClass)),
+    player: createFighter(playerClass, buildDeckForClass(playerClass), playerLabel),
+    cpu: createFighter(cpuClass, buildDeckForClass(cpuClass), cpuLabel),
     round: 1,
     winner: null, // the winning fighter, or null while the game is ongoing
     draw: false,  // true if both fighters ran out of HP in the same round
@@ -214,7 +223,7 @@ export function createBattle(playerClass, cpuClass) {
   };
   drawUpTo(battle.player);
   drawUpTo(battle.cpu);
-  addLog(battle, `${battle.player.classDef.name} vs ${battle.cpu.classDef.name}. Fight!`);
+  addLog(battle, `${fighterName(battle.player)} vs ${fighterName(battle.cpu)}. Fight!`);
   return battle;
 }
 
@@ -287,15 +296,15 @@ function applySetupPhase(actor, opponent, action, battle) {
   switch (card.category) {
     case CARD_CATEGORY.DEFEND:
       resolveDefend(actor, card);
-      addLog(battle, `${actor.classDef.name} sets up ${card.name} (defend).`);
+      addLog(battle, `${fighterName(actor)} sets up ${card.name} (defend).`);
       break;
     case CARD_CATEGORY.BUFF:
       resolveStatusEffects(actor, actor, card);
-      addLog(battle, `${actor.classDef.name} plays ${card.name} (buff).`);
+      addLog(battle, `${fighterName(actor)} plays ${card.name} (buff).`);
       break;
     case CARD_CATEGORY.DEBUFF:
       resolveStatusEffects(actor, opponent, card);
-      addLog(battle, `${actor.classDef.name} plays ${card.name} (debuff).`);
+      addLog(battle, `${fighterName(actor)} plays ${card.name} (debuff).`);
       break;
     // ATTACK is resolved in applyDamagePhase, once both sides' defends and
     // buffs/debuffs for this round are already in place.
@@ -305,10 +314,10 @@ function applySetupPhase(actor, opponent, action, battle) {
 function applyDamagePhase(actor, opponent, action, battle) {
   if (action.kind === "ultimate") {
     const damage = useUltimate(actor, opponent);
-    addLog(battle, `${actor.classDef.name} unleashes its ultimate for ${damage} damage!`);
+    addLog(battle, `${fighterName(actor)} unleashes its ultimate for ${damage} damage!`);
   } else if (action.kind === "card" && action.card.category === CARD_CATEGORY.ATTACK) {
     const damage = resolveAttack(actor, opponent, action.card);
-    addLog(battle, `${actor.classDef.name} hits with ${action.card.name} for ${damage} damage.`);
+    addLog(battle, `${fighterName(actor)} hits with ${action.card.name} for ${damage} damage.`);
   }
 }
 
@@ -321,10 +330,10 @@ function checkOutcome(battle) {
     addLog(battle, "Both fighters go down at the same time -- it's a draw!");
   } else if (cpuDown) {
     battle.winner = battle.player;
-    addLog(battle, `${battle.player.classDef.name} wins!`);
+    addLog(battle, `${fighterName(battle.player)} wins!`);
   } else if (playerDown) {
     battle.winner = battle.cpu;
-    addLog(battle, `${battle.cpu.classDef.name} wins!`);
+    addLog(battle, `${fighterName(battle.cpu)} wins!`);
   }
 }
 
@@ -332,8 +341,14 @@ function checkOutcome(battle) {
 // independently commit its own, then resolve both together.
 export function playRound(battle, playerAction) {
   if (isBattleOver(battle) || !playerAction) return;
+  resolveRound(battle, playerAction, chooseCpuAction(battle));
+}
 
-  const cpuAction = chooseCpuAction(battle);
+// Resolve one round from both sides' already-committed actions. playRound
+// uses this with the CPU's pick; online PvP calls it directly with both
+// players' picks once the server has collected them.
+export function resolveRound(battle, playerAction, cpuAction) {
+  if (isBattleOver(battle)) return;
 
   // Durations tick down at the start of the round, before either side's
   // choice resolves, so something set up last round is still live for this
