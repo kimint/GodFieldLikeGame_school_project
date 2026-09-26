@@ -22,6 +22,8 @@ Then open the URL Vite prints (usually `http://localhost:5173`). Vite serves `in
 ```bash
 npm run build     # production build to dist/ (index.html + model-demo.html)
 npm run preview   # serve that production build locally
+npm run lint      # ESLint
+npm test          # Vitest (tests/)
 ```
 
 `legacy/` isn't part of the production build — its scripts are plain global `<script>` tags with
