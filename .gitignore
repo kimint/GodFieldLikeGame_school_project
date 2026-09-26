@@ -1,3 +1,7 @@
+# Node / Vite
+node_modules/
+dist/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -9,3 +13,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Env overrides (the committed .env only holds public Supabase values)
+.env.local
+.env.*.local

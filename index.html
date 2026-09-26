@@ -4,60 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Godfield-lite</title>
-  <!-- ?v=N is a cache-buster: bump it whenever style.css or any script below
-       changes, so a browser that already cached an old copy is forced to
-       fetch the new one instead of silently mixing old CSS/JS with new HTML. -->
-  <link rel="stylesheet" href="src/style.css?v=3" />
+  <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <main class="app">
-    <h1>Godfield-lite</h1>
-    <p class="subtitle">
-      Class-based card battle: attack / defend / buff / debuff, synergies, and an ultimate meter.
-      Every round you and the CPU pick a card at the same time, then both resolve together.
-      (The original simple prototype still lives at <code>legacy/index.html</code>.)
-    </p>
+  <div id="game"></div>
 
-    <section id="class-select">
-      <h2>Choose your class</h2>
-      <div id="class-options" class="class-options"></div>
-    </section>
-
-    <section id="battle" hidden>
-      <section class="board">
-        <div class="fighter" id="cpu-panel"></div>
-        <div class="fighter" id="player-panel"></div>
-      </section>
-
-      <p id="status" class="turn"></p>
-
-      <section>
-        <h2>Your hand</h2>
-        <div id="hand" class="hand"></div>
-        <button id="ultimate-btn" class="ultimate-btn" disabled>Use Ultimate</button>
-      </section>
-
-      <button id="restart" class="restart">Restart</button>
-
-      <section>
-        <h2>Battle log</h2>
-        <ul id="log" class="log"></ul>
-      </section>
-    </section>
-  </main>
-
-  <!-- Loaded in dependency order. Same ?v=1 cache-buster as style.css above. -->
-  <script src="src/model/util.js?v=1"></script>
-  <script src="src/model/stats.js?v=1"></script>
-  <script src="src/model/damageTypes.js?v=1"></script>
-  <script src="src/model/effects.js?v=1"></script>
-  <script src="src/model/cardTypes.js?v=1"></script>
-  <script src="src/model/synergies.js?v=1"></script>
-  <script src="src/model/classes.js?v=1"></script>
-  <script src="src/model/data.js?v=1"></script>
-  <script src="src/model/decks.js?v=1"></script>
-  <script src="src/model/engine.js?v=1"></script>
-  <script src="src/icons.js?v=2"></script>
-  <script src="src/app.js?v=3"></script>
+  <!-- Single module entry point; Vite bundles everything src/main.js imports,
+       including Phaser. The whole UI is drawn on the canvas -- see src/scenes/. -->
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

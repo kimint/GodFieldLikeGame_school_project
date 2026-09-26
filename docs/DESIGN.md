@@ -84,6 +84,11 @@ actually withholds each player's hand/pending action from the other's client unt
 resolution — a server, or something like a shared session both clients poll/connect
 to — before PvP or fog of war can be built.
 
+**PvP now does this with Supabase** (see "Online PvP" in README.md): the full battle,
+both hands, and both pending moves live in a table only the `game` Edge Function can
+read; each browser can read only the public match state plus its own hand. Fog of war
+would build on the same split.
+
 ## Open questions to resolve before implementation
 
 - Can a class have more than one synergy active at once?

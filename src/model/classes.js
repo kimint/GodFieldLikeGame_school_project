@@ -2,7 +2,10 @@
 // unique ultimate + class-based passives. See docs/DESIGN.md ("Class system /
 // deck synergy system", "Basic stats").
 
-function createClass({ id, name, baseStats, synergyPool, ultimate, passives = [] }) {
+import { createStats } from "./stats.js";
+import { EFFECT_KIND, MODIFIER_MODE } from "./effects.js";
+
+export function createClass({ id, name, baseStats, synergyPool, ultimate, passives = [] }) {
   return {
     id,
     name,
@@ -18,14 +21,14 @@ function createClass({ id, name, baseStats, synergyPool, ultimate, passives = []
 // `damage` is a placeholder generic effect (flat true damage) just so the
 // meter-fills-then-use mechanic is demonstrable end to end; real ultimate
 // design (and whether it's even damage-shaped) is still undecided.
-function createUltimate({ id, name, description, cost, damage = 0 }) {
+export function createUltimate({ id, name, description, cost, damage = 0 }) {
   return { id, name, description, cost, damage };
 }
 
 // Apply a list of effects on top of a class's base stats. Only STAT_MODIFIER
 // effects change the stat block here -- other kinds (energy regen, synergy
 // disable, meter siphon, ...) belong to other systems and are left alone.
-function computeEffectiveStats(classDef, effects) {
+export function computeEffectiveStats(classDef, effects) {
   const stats = createStats(classDef.baseStats);
   for (const effect of effects) {
     if (effect.kind !== EFFECT_KIND.STAT_MODIFIER) continue;

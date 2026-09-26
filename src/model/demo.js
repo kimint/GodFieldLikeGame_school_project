@@ -1,7 +1,13 @@
-// Tiny in-browser smoke test for the data model in src/model/*. There's no
-// Node/npm test runner in this environment, so this just renders pass/fail
-// lines to the page (model-demo.html) -- enough to prove the pieces fit
-// together, not a real test framework.
+// Tiny in-browser smoke test for the data model in src/model/*. Renders
+// pass/fail lines to the page (model-demo.html) -- enough to prove the
+// pieces fit together, not a real test framework.
+
+import { computeEffectiveStats } from "./classes.js";
+import { exampleClassGuardian, exampleAttackCard, exampleDefendCard } from "./data.js";
+import { resolveSynergies } from "./synergies.js";
+import { applyDefend, createDefendCard, createAttackCard, STACKING } from "./cardTypes.js";
+import { DAMAGE_TYPE } from "./damageTypes.js";
+import { MODIFIER_MODE } from "./effects.js";
 
 const results = [];
 

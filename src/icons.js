@@ -6,7 +6,10 @@
 // This is UI-only (produces markup strings for src/app.js to insert), so it
 // lives alongside app.js rather than in src/model/, which stays DOM-free.
 
-const DAMAGE_TYPE_ACCENT = {
+import { DAMAGE_TYPE } from "./model/damageTypes.js";
+import { CARD_CATEGORY } from "./model/cardTypes.js";
+
+export const DAMAGE_TYPE_ACCENT = {
   [DAMAGE_TYPE.PHYSICAL]: "#c9c9c9",
   [DAMAGE_TYPE.MAGIC]: "#b388ff",
   [DAMAGE_TYPE.ELEMENT]: "#ff9d4d",
@@ -40,7 +43,7 @@ const CATEGORY_ICON_BODY = {
 // Build the <svg> markup for one card: its category's base shape, plus a
 // damage-type accent dot for attack/defend cards (buff/debuff aren't typed by
 // damage, so they don't get one).
-function cardIconMarkup(card) {
+export function cardIconMarkup(card) {
   const body = CATEGORY_ICON_BODY[card.category] ?? "";
   const isTyped = card.category === CARD_CATEGORY.ATTACK || card.category === CARD_CATEGORY.DEFEND;
   const accent = isTyped ? DAMAGE_TYPE_ACCENT[card.damageType] : null;
@@ -79,7 +82,7 @@ const CLASS_ICON_BODY = {
 // Returns "" (no icon) for a class id that isn't in CLASS_ICON_BODY, rather
 // than throwing -- a new class just quietly renders without one until an
 // icon is added for it.
-function classIconMarkup(classDef) {
+export function classIconMarkup(classDef) {
   const body = CLASS_ICON_BODY[classDef.id];
   if (!body) return "";
   return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
@@ -98,6 +101,6 @@ const ULTIMATE_ICON_BODY = `
   <circle cx="12" cy="12" r="2.6" fill="#fff8e1"/>
 `;
 
-function ultimateIconMarkup() {
+export function ultimateIconMarkup() {
   return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${ULTIMATE_ICON_BODY}</svg>`;
 }
