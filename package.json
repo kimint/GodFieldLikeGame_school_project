@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "catalog:sql": "node scripts/catalog-sql.js",
-    "cards:art": "node scripts/card-art.js"
+    "cards:art": "node scripts/card-art.js",
+    "backgrounds": "node scripts/backgrounds.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

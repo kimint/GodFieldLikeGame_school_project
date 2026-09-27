@@ -13,33 +13,54 @@ import {
   leaveMatch,
   watchMatch,
 } from "../online/matchApi.js";
-import { COLORS, TEXT, FONT_FAMILY, createButton, useRenderScale } from "./theme.js";
+import {
+  COLORS,
+  TEXT,
+  FONT_FAMILY,
+  BACKGROUNDS,
+  addBackground,
+  preloadBackground,
+  createButton,
+  textShadow,
+  useRenderScale,
+} from "./theme.js";
 
 export class LobbyScene extends Phaser.Scene {
   constructor() {
     super("LobbyScene");
   }
 
+  preload() {
+    preloadBackground(this, BACKGROUNDS.classSelect);
+  }
+
   // data: { mode: "create" | "join", playerClass, code? }
   create(data) {
     useRenderScale(this);
+    addBackground(this, BACKGROUNDS.classSelect);
     this.matchId = null;
     this.userId = null;
     this.starting = false;
     this.stopWatching = null;
     this.events.once("shutdown", () => this.stopWatching?.());
 
-    this.add
-      .text(480, 32, "Godfield-lite — Online", { fontFamily: FONT_FAMILY, fontSize: "28px", fontStyle: "700", color: TEXT.white })
-      .setOrigin(0.5, 0);
+    textShadow(
+      this.add
+        .text(480, 32, "Godfield-lite — Online", { fontFamily: FONT_FAMILY, fontSize: "28px", fontStyle: "700", color: TEXT.white })
+        .setOrigin(0.5, 0)
+    );
 
-    this.add
-      .text(480, 80, `Playing as ${data.playerClass.name}`, { fontFamily: FONT_FAMILY, fontSize: "14px", color: TEXT.muted })
-      .setOrigin(0.5, 0);
+    textShadow(
+      this.add
+        .text(480, 80, `Playing as ${data.playerClass.name}`, { fontFamily: FONT_FAMILY, fontSize: "14px", color: TEXT.body })
+        .setOrigin(0.5, 0)
+    );
 
-    this.codeText = this.add
-      .text(480, 200, "", { fontFamily: FONT_FAMILY, fontSize: "56px", fontStyle: "700", color: TEXT.white })
-      .setOrigin(0.5, 0);
+    this.codeText = textShadow(
+      this.add
+        .text(480, 200, "", { fontFamily: FONT_FAMILY, fontSize: "56px", fontStyle: "700", color: TEXT.white })
+        .setOrigin(0.5, 0)
+    );
 
     this.statusText = this.add
       .text(480, 300, "", {
@@ -49,7 +70,8 @@ export class LobbyScene extends Phaser.Scene {
         align: "center",
         wordWrap: { width: 640 },
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setShadow(0, 1, "#000000", 4, false, true);
 
     createButton(this, 425, 420, 110, 40, "Back", {
       color: COLORS.restart,

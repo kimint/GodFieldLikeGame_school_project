@@ -27,7 +27,18 @@ import { allCards, allClasses } from "../model/catalog.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY } from "../phaserIcons.js";
 import { loadCardArt } from "../cardArt.js";
 import { isMuted, playSfx, setMuted } from "../fx/sound.js";
-import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton, useRenderScale } from "./theme.js";
+import {
+  COLORS,
+  TEXT,
+  FONT_FAMILY,
+  BACKGROUNDS,
+  addBackground,
+  preloadBackground,
+  roundedRect,
+  createButton,
+  textShadow,
+  useRenderScale,
+} from "./theme.js";
 import { drawCardFace } from "./cardFace.js";
 import { playRoundRecap, setRecapSpeed } from "./roundRecap.js";
 
@@ -71,6 +82,14 @@ const CHIP_COLOR = {
 };
 
 const GUARD_COLOR = 0x6ec6ff;
+
+// Where the background's wall torches are painted -- keep in sync with
+// TORCHES in scripts/backgrounds.js.
+const TORCHES = [
+  { x: 118, y: 322 },
+  { x: 842, y: 322 },
+];
+const TORCH_GLOW_KEY = "torch-glow";
 
 // Round-recap playback speeds the Speed button cycles through; the choice is
 // remembered per browser.
@@ -130,6 +149,38 @@ export class BattleScene extends Phaser.Scene {
 
   preload() {
     preloadIcons(this, allClasses());
+    preloadBackground(this, BACKGROUNDS.battle);
+  }
+
+  // A flickering warm glow over each wall torch painted in the background.
+  addTorchLight() {
+    if (!this.textures.exists(BACKGROUNDS.battle.key)) return;
+    if (!this.textures.exists(TORCH_GLOW_KEY)) {
+      // A soft radial glow, drawn once into a canvas texture.
+      const texture = this.textures.createCanvas(TORCH_GLOW_KEY, 128, 128);
+      const ctx = texture.getContext();
+      const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      gradient.addColorStop(0, "rgba(255, 214, 150, 1)");
+      gradient.addColorStop(0.3, "rgba(255, 157, 77, 0.55)");
+      gradient.addColorStop(1, "rgba(255, 122, 42, 0)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 128, 128);
+      texture.refresh();
+    }
+    for (const { x, y } of TORCHES) {
+      const glow = this.add.image(x, y - 16, TORCH_GLOW_KEY).setDisplaySize(190, 190).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5);
+      // Alpha and size flicker on unrelated periods, so it never looks regular.
+      this.tweens.add({ targets: glow, alpha: 0.28, duration: 150 + Math.random() * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.tweens.add({
+        targets: glow,
+        scale: glow.scale * 0.9,
+        duration: 230 + Math.random() * 120,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+        delay: Math.random() * 100,
+      });
+    }
   }
 
   // --- battle source (overridden by OnlineBattleScene) ---------------------
@@ -204,9 +255,19 @@ export class BattleScene extends Phaser.Scene {
       this.time.timeScale = 1;
     });
 
-    this.add
-      .text(480, 14, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "20px", fontStyle: "700", color: TEXT.white })
-      .setOrigin(0.5, 0);
+    addBackground(this, BACKGROUNDS.battle);
+    this.addTorchLight();
+
+    // Dark backing so the battle log reads cleanly over the hall's floor.
+    const logBacking = this.add.graphics();
+    logBacking.fillStyle(0x0b0d15, 0.72);
+    logBacking.fillRoundedRect(LOG_X - 14, LOG_Y - 32, LOG_W + 28, LOG_H + 42, 12);
+
+    textShadow(
+      this.add
+        .text(480, 14, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "20px", fontStyle: "700", color: TEXT.white })
+        .setOrigin(0.5, 0)
+    );
 
     const soundLabel = () => (isMuted() ? "Sound: off" : "Sound: on");
     const soundButton = createButton(this, 960 - 40 - 110, 12, 110, 26, soundLabel(), {
@@ -236,13 +297,17 @@ export class BattleScene extends Phaser.Scene {
     this.cpuPanel = this.add.container(0, 0);
     this.playerPanel = this.add.container(0, 0);
 
-    this.statusText = this.add
-      .text(480, PANEL_Y + PANEL_H + 8, "", { fontFamily: FONT_FAMILY, fontSize: "14px", fontStyle: "700", color: TEXT.body, align: "center" })
-      .setOrigin(0.5, 0);
+    this.statusText = textShadow(
+      this.add
+        .text(480, PANEL_Y + PANEL_H + 8, "", { fontFamily: FONT_FAMILY, fontSize: "14px", fontStyle: "700", color: TEXT.white, align: "center" })
+        .setOrigin(0.5, 0)
+    );
 
-    this.add
-      .text(480, HAND_Y - 20, "Your hand", { fontFamily: FONT_FAMILY, fontSize: "13px", color: TEXT.muted })
-      .setOrigin(0.5, 0);
+    textShadow(
+      this.add
+        .text(480, HAND_Y - 20, "Your hand", { fontFamily: FONT_FAMILY, fontSize: "13px", fontStyle: "700", color: TEXT.body })
+        .setOrigin(0.5, 0)
+    );
 
     this.handContainer = this.add.container(0, HAND_Y);
 

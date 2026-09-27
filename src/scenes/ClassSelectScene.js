@@ -8,7 +8,18 @@ import { allClasses } from "../model/catalog.js";
 import { onlineAvailable } from "../online/matchApi.js";
 import { promptDialog } from "../ui/dialog.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY } from "../phaserIcons.js";
-import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton, useRenderScale } from "./theme.js";
+import {
+  COLORS,
+  TEXT,
+  FONT_FAMILY,
+  BACKGROUNDS,
+  addBackground,
+  preloadBackground,
+  roundedRect,
+  createButton,
+  textShadow,
+  useRenderScale,
+} from "./theme.js";
 
 const CARD_W = 260;
 const CARD_H = 210;
@@ -21,13 +32,17 @@ export class ClassSelectScene extends Phaser.Scene {
 
   preload() {
     preloadIcons(this, allClasses());
+    preloadBackground(this, BACKGROUNDS.classSelect);
   }
 
   create() {
     useRenderScale(this);
-    this.add
-      .text(480, 32, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "28px", fontStyle: "700", color: TEXT.white })
-      .setOrigin(0.5, 0);
+    addBackground(this, BACKGROUNDS.classSelect);
+    textShadow(
+      this.add
+        .text(480, 32, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "28px", fontStyle: "700", color: TEXT.white })
+        .setOrigin(0.5, 0)
+    );
 
     createButton(this, 960 - 30 - 130, 24, 130, 34, "Card gallery", {
       color: COLORS.restart,
@@ -41,13 +56,16 @@ export class ClassSelectScene extends Phaser.Scene {
         72,
         "Class-based card battle: attack / defend / buff / debuff, synergies, and an ultimate meter.\n" +
           "Every round both sides pick a card at the same time, then both resolve together.",
-        { fontFamily: FONT_FAMILY, fontSize: "13px", color: TEXT.muted, align: "center", wordWrap: { width: 640 } }
+        { fontFamily: FONT_FAMILY, fontSize: "13px", color: TEXT.body, align: "center", wordWrap: { width: 640 } }
       )
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5, 0)
+      .setShadow(0, 1, "#000000", 4, false, true);
 
-    this.add
-      .text(480, 134, "Choose your class", { fontFamily: FONT_FAMILY, fontSize: "16px", color: TEXT.muted })
-      .setOrigin(0.5, 0);
+    textShadow(
+      this.add
+        .text(480, 134, "Choose your class", { fontFamily: FONT_FAMILY, fontSize: "16px", fontStyle: "700", color: TEXT.body })
+        .setOrigin(0.5, 0)
+    );
 
     const classes = allClasses();
     const totalWidth = classes.length * CARD_W + (classes.length - 1) * CARD_GAP;

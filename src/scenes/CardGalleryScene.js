@@ -14,7 +14,18 @@ import { CARD_CATEGORY } from "../model/cardTypes.js";
 import { describeCard } from "../model/engine.js";
 import { preloadIcons, classIconKey, CARD_ICON_KEY, damageAccentColor } from "../phaserIcons.js";
 import { cardArtKey, loadCardArt } from "../cardArt.js";
-import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton, useRenderScale } from "./theme.js";
+import {
+  COLORS,
+  TEXT,
+  FONT_FAMILY,
+  BACKGROUNDS,
+  addBackground,
+  preloadBackground,
+  roundedRect,
+  createButton,
+  textShadow,
+  useRenderScale,
+} from "./theme.js";
 
 const CATEGORY_ORDER = [CARD_CATEGORY.ATTACK, CARD_CATEGORY.DEFEND, CARD_CATEGORY.BUFF, CARD_CATEGORY.DEBUFF];
 const ALL = "all";
@@ -50,10 +61,15 @@ export class CardGalleryScene extends Phaser.Scene {
 
   preload() {
     preloadIcons(this, allClasses());
+    preloadBackground(this, BACKGROUNDS.classSelect);
   }
 
   create() {
     useRenderScale(this);
+    // The castle backdrop, dimmed so the card grid stays easy to scan.
+    if (addBackground(this, BACKGROUNDS.classSelect)) {
+      this.add.rectangle(0, 0, 960, 760, 0x05070d, 0.45).setOrigin(0, 0);
+    }
 
     // Stable order regardless of how the database returned the rows:
     // by category (attack, defend, buff, debuff), then by name.
@@ -64,14 +80,18 @@ export class CardGalleryScene extends Phaser.Scene {
     this.filter = ALL;
     this.page = 0;
 
-    this.add
-      .text(480, 24, "Card Gallery", { fontFamily: FONT_FAMILY, fontSize: "28px", fontStyle: "700", color: TEXT.white })
-      .setOrigin(0.5, 0);
+    textShadow(
+      this.add
+        .text(480, 24, "Card Gallery", { fontFamily: FONT_FAMILY, fontSize: "28px", fontStyle: "700", color: TEXT.white })
+        .setOrigin(0.5, 0)
+    );
 
     const source = getCatalog().source === "supabase" ? "loaded from the database" : "local copy (database not reachable)";
-    this.add
-      .text(480, 64, `${this.cards.length} cards · ${source}`, { fontFamily: FONT_FAMILY, fontSize: "13px", color: TEXT.muted })
-      .setOrigin(0.5, 0);
+    textShadow(
+      this.add
+        .text(480, 64, `${this.cards.length} cards · ${source}`, { fontFamily: FONT_FAMILY, fontSize: "13px", color: TEXT.body })
+        .setOrigin(0.5, 0)
+    );
 
     createButton(this, 30, FOOTER_Y, 110, 40, "← Back", {
       color: COLORS.restart,
