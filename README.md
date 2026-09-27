@@ -198,7 +198,7 @@ pillars (heat haze, roar, crackling blast). A class without an entry in `THEMES`
 generic gold effect, so adding a class never breaks the recap.
 
 When the game ends, a **VICTORY / DEFEAT / DRAW** screen appears in the middle of the screen
-(rays and confetti for a win), with the final HP, a Play again / Back to menu button, and "View
+(rays and confetti for a win), with the final HP, a Back to menu button, and "View
 board" to close it and look at the final state.
 
 Sound effects are synthesized in the browser with Web Audio (`src/fx/sound.js`), so there are no

@@ -203,11 +203,6 @@ export class BattleScene extends Phaser.Scene {
     return "Restart";
   }
 
-  // The main button on the end-of-game screen (runs onLeave).
-  get resultButtonLabel() {
-    return "Play again";
-  }
-
   // The line under VICTORY / DEFEAT / DRAW.
   resultSubtitle() {
     const b = this.battle;
@@ -534,7 +529,7 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     layer.add([title, subtitle, summary]);
 
-    const primary = createButton(this, cx - 170, cy + 150, 160, 44, this.resultButtonLabel, {
+    const primary = createButton(this, cx - 170, cy + 150, 160, 44, "Back to menu", {
       color: COLORS.ultimate,
       hoverColor: COLORS.ultimateHover,
       onClick: () => this.onLeave(),

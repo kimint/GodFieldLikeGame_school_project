@@ -53,10 +53,6 @@ export class OnlineBattleScene extends BattleScene {
     return "Leave";
   }
 
-  get resultButtonLabel() {
-    return "Back to menu";
-  }
-
   resultSubtitle() {
     const b = this.battle;
     // The server logs "Player N left the match." when someone forfeits.
