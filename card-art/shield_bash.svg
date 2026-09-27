@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#b5423a"/>
+      <stop offset="1" stop-color="#2a0b09"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffb199" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffb199" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.6"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f6fa"/>
+      <stop offset="0.55" stop-color="#b8c0cd"/>
+      <stop offset="1" stop-color="#7d8697"/>
+    </linearGradient>
+    <linearGradient id="fireOuter" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff4d1a"/>
+      <stop offset="0.6" stop-color="#ff9d4d"/>
+      <stop offset="1" stop-color="#ffd23f"/>
+    </linearGradient>
+    <linearGradient id="fireInner" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ffe066"/>
+      <stop offset="1" stop-color="#fffbe6"/>
+    </linearGradient>
+    <linearGradient id="fireShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd29a"/>
+      <stop offset="1" stop-color="#c7612a"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="360" fill="url(#bg)"/>
+  <circle cx="240" cy="180" r="170" fill="url(#halo)"/>
+  <g opacity="0.12" stroke="#ffffff" stroke-width="2" fill="none">
+    <circle cx="240" cy="180" r="120"/><circle cx="240" cy="180" r="150"/>
+  </g>
+  
+    <g stroke="#ffffff" stroke-opacity="0.55" stroke-width="8" stroke-linecap="round">
+      <line x1="60" y1="140" x2="130" y2="140"/><line x1="44" y1="185" x2="124" y2="185"/><line x1="64" y1="230" x2="130" y2="230"/>
+    </g>
+    
+  <g transform="translate(215 180) scale(1.05)">
+    <path d="M-62 -84 Q0 -104 62 -84 L62 -8 C62 44 28 78 0 96 C-28 78 -62 44 -62 -8 Z" fill="url(#metal)" stroke="#1b1f2c" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M-44 -70 Q0 -84 44 -70 L44 -8 C44 32 20 58 0 72 C-20 58 -44 32 -44 -8 Z" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="4"/>
+  </g>
+    <circle cx="215" cy="176" r="20" fill="#c9ced8" stroke="#1b1f2c" stroke-width="6"/>
+    <polygon points="397.0,170.0 360.8,180.7 378.8,213.8 345.7,195.8 335.0,232.0 324.3,195.8 291.2,213.8 309.2,180.7 273.0,170.0 309.2,159.3 291.2,126.2 324.3,144.2 335.0,108.0 345.7,144.2 378.8,126.2 360.8,159.3" fill="#ffe066" stroke="#1b1f2c" stroke-width="4" stroke-linejoin="round"/>
+    <polygon points="365.0,170.0 347.5,175.2 356.2,191.2 340.2,182.5 335.0,200.0 329.8,182.5 313.8,191.2 322.5,175.2 305.0,170.0 322.5,164.8 313.8,148.8 329.8,157.5 335.0,140.0 340.2,157.5 356.2,148.8 347.5,164.8" fill="#ffffff" stroke="#1b1f2c" stroke-width="4" stroke-linejoin="round"/>
+  <rect width="480" height="360" fill="url(#vignette)"/>
+</svg>

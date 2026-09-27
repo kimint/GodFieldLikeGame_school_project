@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#3a8f5a"/>
+      <stop offset="1" stop-color="#08200f"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#b6ffcf" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#b6ffcf" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.6"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f6fa"/>
+      <stop offset="0.55" stop-color="#b8c0cd"/>
+      <stop offset="1" stop-color="#7d8697"/>
+    </linearGradient>
+    <linearGradient id="fireOuter" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff4d1a"/>
+      <stop offset="0.6" stop-color="#ff9d4d"/>
+      <stop offset="1" stop-color="#ffd23f"/>
+    </linearGradient>
+    <linearGradient id="fireInner" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ffe066"/>
+      <stop offset="1" stop-color="#fffbe6"/>
+    </linearGradient>
+    <linearGradient id="fireShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd29a"/>
+      <stop offset="1" stop-color="#c7612a"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="360" fill="url(#bg)"/>
+  <circle cx="240" cy="180" r="170" fill="url(#halo)"/>
+  <g opacity="0.12" stroke="#ffffff" stroke-width="2" fill="none">
+    <circle cx="240" cy="180" r="120"/><circle cx="240" cy="180" r="150"/>
+  </g>
+  
+    <g fill="none" stroke-linecap="round">
+      <path d="M60 250 C140 250 150 180 110 170 C80 162 72 200 100 206" stroke="#ffffff" stroke-width="12"/>
+      <path d="M90 300 C220 300 260 220 230 180 C205 148 160 170 175 200" stroke="#b6ffcf" stroke-width="14"/>
+      <path d="M150 120 C260 120 300 60 360 90 C400 110 390 150 355 146" stroke="#ffffff" stroke-width="10" opacity="0.85"/>
+      <path d="M200 330 C330 330 420 270 410 200 C404 160 360 160 360 190" stroke="#ffffff" stroke-width="12" opacity="0.8"/>
+    </g>
+    <g transform="translate(330 230) rotate(0) scale(0.9)">
+    <path d="M0 -50 L42 0 H18 V50 H-18 V0 H-42 Z" fill="#b6ffcf" stroke="#1b1f2c" stroke-width="6" stroke-linejoin="round"/>
+  </g>
+    <circle cx="300" cy="70" r="7" fill="#ffffff"/><circle cx="420" cy="120" r="6" fill="#ffffff"/><circle cx="90" cy="110" r="5" fill="#ffffff"/><circle cx="250" cy="50" r="5" fill="#ffffff"/>
+  <rect width="480" height="360" fill="url(#vignette)"/>
+</svg>

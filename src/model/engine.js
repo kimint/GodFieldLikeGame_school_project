@@ -51,6 +51,7 @@ export function createFighter(classDef, deck, label = null) {
     tempModifiers: [], // [{ effect, remaining }] from buff/debuff cards
     disabledSynergies: new Set(),
     disabledSynergyTimers: {}, // synergyId -> remaining turns
+    lastAction: null, // what this fighter did in the last resolved round -- see recordAction
   };
 }
 
@@ -111,10 +112,14 @@ export function canUseUltimate(fighter) {
 
 // --- resolving a played card --------------------------------------------
 
+// Returns { damage, guarded, resisted }: the damage dealt, and how much of
+// the card's value the defender's active defend card and resistance stat
+// each absorbed (shown in the round recap).
 function resolveAttack(attacker, defender, card) {
   const defenderStats = computeCurrentStats(defender);
   const activeDefend = defender.activeDefends[card.damageType] ?? null;
-  let value = applyDefend(card, activeDefend ? activeDefend.card : null);
+  const afterDefend = applyDefend(card, activeDefend ? activeDefend.card : null);
+  let value = afterDefend;
 
   const resistKey = RESIST_STAT[card.damageType]; // undefined for TRUE damage
   if (resistKey) {
@@ -126,7 +131,7 @@ function resolveAttack(attacker, defender, card) {
   }
 
   defender.hp = Math.max(0, defender.hp - value);
-  return value;
+  return { damage: value, guarded: card.value - afterDefend, resisted: afterDefend - value };
 }
 
 function resolveDefend(actor, card) {
@@ -311,14 +316,41 @@ function applySetupPhase(actor, opponent, action, battle) {
   }
 }
 
+// Returns { damage, guarded, resisted } (see resolveAttack), or null for
+// actions that don't deal damage.
 function applyDamagePhase(actor, opponent, action, battle) {
   if (action.kind === "ultimate") {
     const damage = useUltimate(actor, opponent);
     addLog(battle, `${fighterName(actor)} unleashes its ultimate for ${damage} damage!`);
-  } else if (action.kind === "card" && action.card.category === CARD_CATEGORY.ATTACK) {
-    const damage = resolveAttack(actor, opponent, action.card);
-    addLog(battle, `${fighterName(actor)} hits with ${action.card.name} for ${damage} damage.`);
+    return { damage, guarded: 0, resisted: 0 };
   }
+  if (action.kind === "card" && action.card.category === CARD_CATEGORY.ATTACK) {
+    const hit = resolveAttack(actor, opponent, action.card);
+    addLog(battle, `${fighterName(actor)} hits with ${action.card.name} for ${hit.damage} damage.`);
+    return hit;
+  }
+  return null;
+}
+
+// A plain-JSON summary of what a fighter did this round, kept on the fighter
+// as `lastAction` so the UI can replay the round (animation) once it
+// resolves. It's public: the same information is already in the battle log.
+function recordAction(fighter, action, round, hit) {
+  const card = action.kind === "card" ? action.card : null;
+  const isDefend = card?.category === CARD_CATEGORY.DEFEND;
+  fighter.lastAction = {
+    round,
+    kind: action.kind,
+    cardId: card?.cardId ?? null,
+    name: card?.name ?? null,
+    category: card?.category ?? null,
+    damageType: card?.damageType ?? null,
+    description: card ? describeCard(card) : null,
+    damage: hit?.damage ?? null,
+    guarded: hit?.guarded ?? 0, // absorbed by the target's defend card
+    resisted: hit?.resisted ?? 0, // absorbed by the target's DEF/MR/ER
+    guard: isDefend ? { amount: card.amount, mode: card.mode, duration: card.duration } : null,
+  };
 }
 
 function checkOutcome(battle) {
@@ -360,8 +392,10 @@ export function resolveRound(battle, playerAction, cpuAction) {
   addLog(battle, `-- Round ${battle.round} --`);
   applySetupPhase(battle.player, battle.cpu, playerAction, battle);
   applySetupPhase(battle.cpu, battle.player, cpuAction, battle);
-  applyDamagePhase(battle.player, battle.cpu, playerAction, battle);
-  applyDamagePhase(battle.cpu, battle.player, cpuAction, battle);
+  const playerHit = applyDamagePhase(battle.player, battle.cpu, playerAction, battle);
+  const cpuHit = applyDamagePhase(battle.cpu, battle.player, cpuAction, battle);
+  recordAction(battle.player, playerAction, battle.round, playerHit);
+  recordAction(battle.cpu, cpuAction, battle.round, cpuHit);
 
   checkOutcome(battle);
   if (isBattleOver(battle)) return;
@@ -373,7 +407,7 @@ export function resolveRound(battle, playerAction, cpuAction) {
 
 // --- small text helpers used by the UI -----------------------------------
 
-function describeEffect(effect) {
+export function describeEffect(effect) {
   switch (effect.kind) {
     case EFFECT_KIND.STAT_MODIFIER: {
       const amount = effect.mode === MODIFIER_MODE.PERCENT ? `${effect.amount * 100}%` : effect.amount;

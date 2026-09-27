@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#6a4a94"/>
+      <stop offset="1" stop-color="#150b24"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#e0c2ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#e0c2ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.6"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f6fa"/>
+      <stop offset="0.55" stop-color="#b8c0cd"/>
+      <stop offset="1" stop-color="#7d8697"/>
+    </linearGradient>
+    <linearGradient id="fireOuter" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff4d1a"/>
+      <stop offset="0.6" stop-color="#ff9d4d"/>
+      <stop offset="1" stop-color="#ffd23f"/>
+    </linearGradient>
+    <linearGradient id="fireInner" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ffe066"/>
+      <stop offset="1" stop-color="#fffbe6"/>
+    </linearGradient>
+    <linearGradient id="fireShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd29a"/>
+      <stop offset="1" stop-color="#c7612a"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="360" fill="url(#bg)"/>
+  <circle cx="240" cy="180" r="170" fill="url(#halo)"/>
+  <g opacity="0.12" stroke="#ffffff" stroke-width="2" fill="none">
+    <circle cx="240" cy="180" r="120"/><circle cx="240" cy="180" r="150"/>
+  </g>
+  
+    <path d="M40 290 H440" stroke="#1b1f2c" stroke-width="10" stroke-linecap="round"/>
+    <g fill="#2a1a12" opacity="0.9">
+      <ellipse cx="240" cy="296" rx="150" ry="22"/>
+    </g>
+    <path d="M150 292 L130 330 M200 292 L205 340 M280 292 L300 336 M330 292 L360 326" stroke="#ff9d4d" stroke-width="5" fill="none" stroke-linecap="round"/>
+    
+  <g transform="translate(170 230) rotate(0) scale(0.8)">
+    <path d="M0 -70 C22 -38 44 -18 38 14 C33 42 16 58 0 58 C-16 58 -33 42 -38 14 C-42 -8 -22 -24 -12 -46 C-6 -30 2 -26 6 -20 C8 -38 4 -54 0 -70 Z" fill="url(#fireOuter)"/>
+    <path d="M0 -24 C12 -6 20 6 18 22 C16 38 8 46 0 46 C-8 46 -16 38 -18 24 C-20 10 -10 0 -4 -10 C0 -2 4 0 6 2 C6 -8 4 -16 0 -24 Z" fill="url(#fireInner)"/>
+  </g>
+    
+  <g transform="translate(310 236) rotate(0) scale(0.7)">
+    <path d="M0 -70 C22 -38 44 -18 38 14 C33 42 16 58 0 58 C-16 58 -33 42 -38 14 C-42 -8 -22 -24 -12 -46 C-6 -30 2 -26 6 -20 C8 -38 4 -54 0 -70 Z" fill="url(#fireOuter)"/>
+    <path d="M0 -24 C12 -6 20 6 18 22 C16 38 8 46 0 46 C-8 46 -16 38 -18 24 C-20 10 -10 0 -4 -10 C0 -2 4 0 6 2 C6 -8 4 -16 0 -24 Z" fill="url(#fireInner)"/>
+  </g>
+    
+  <g transform="translate(240 210) rotate(0) scale(1)">
+    <path d="M0 -70 C22 -38 44 -18 38 14 C33 42 16 58 0 58 C-16 58 -33 42 -38 14 C-42 -8 -22 -24 -12 -46 C-6 -30 2 -26 6 -20 C8 -38 4 -54 0 -70 Z" fill="url(#fireOuter)"/>
+    <path d="M0 -24 C12 -6 20 6 18 22 C16 38 8 46 0 46 C-8 46 -16 38 -18 24 C-20 10 -10 0 -4 -10 C0 -2 4 0 6 2 C6 -8 4 -16 0 -24 Z" fill="url(#fireInner)"/>
+  </g>
+    <g transform="translate(240 95) rotate(180) scale(0.8)">
+    <path d="M0 -50 L42 0 H18 V50 H-18 V0 H-42 Z" fill="#e0c2ff" stroke="#1b1f2c" stroke-width="6" stroke-linejoin="round"/>
+  </g>
+    <g fill="#8a8f9c" opacity="0.7"><circle cx="110" cy="120" r="18"/><circle cx="135" cy="95" r="14"/><circle cx="370" cy="110" r="20"/><circle cx="395" cy="80" r="12"/></g>
+  <rect width="480" height="360" fill="url(#vignette)"/>
+</svg>

@@ -6,6 +6,7 @@
 import Phaser from "phaser";
 import { allClasses } from "../model/catalog.js";
 import { onlineAvailable } from "../online/matchApi.js";
+import { promptDialog } from "../ui/dialog.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY } from "../phaserIcons.js";
 import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton, useRenderScale } from "./theme.js";
 
@@ -95,10 +96,17 @@ export class ClassSelectScene extends Phaser.Scene {
     for (const [id, outline] of this.selectionOutlines) outline.setVisible(id === classDef.id);
   }
 
-  onJoinClick() {
-    const code = window.prompt("Enter the room code your friend sent you:");
-    if (!code || !code.trim()) return;
-    this.scene.start("LobbyScene", { mode: "join", code: code.trim(), playerClass: this.selectedClass });
+  async onJoinClick() {
+    const code = await promptDialog({
+      title: "Join a room",
+      message: "Enter the room code your friend sent you.",
+      placeholder: "ABCDE",
+      maxLength: 5,
+      uppercase: true,
+      confirmLabel: "Join",
+    });
+    if (!code || !this.sys.isActive()) return;
+    this.scene.start("LobbyScene", { mode: "join", code, playerClass: this.selectedClass });
   }
 
   createClassCard(x, y, classDef) {

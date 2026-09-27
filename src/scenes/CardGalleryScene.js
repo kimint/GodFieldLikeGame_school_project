@@ -13,6 +13,7 @@ import { allCards, allClasses, deckEntriesForCard, getCatalog } from "../model/c
 import { CARD_CATEGORY } from "../model/cardTypes.js";
 import { describeCard } from "../model/engine.js";
 import { preloadIcons, classIconKey, CARD_ICON_KEY, damageAccentColor } from "../phaserIcons.js";
+import { cardArtKey, loadCardArt } from "../cardArt.js";
 import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton, useRenderScale } from "./theme.js";
 
 const CATEGORY_ORDER = [CARD_CATEGORY.ATTACK, CARD_CATEGORY.DEFEND, CARD_CATEGORY.BUFF, CARD_CATEGORY.DEBUFF];
@@ -40,7 +41,7 @@ const ART_H = 100;
 const FOOTER_Y = 696;
 
 const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
-const artKey = (card) => `card-art-${card.id}`;
+const artKey = (card) => cardArtKey(card.id);
 
 export class CardGalleryScene extends Phaser.Scene {
   constructor() {
@@ -114,16 +115,7 @@ export class CardGalleryScene extends Phaser.Scene {
   // Queue every card's artwork that isn't loaded yet; re-render once they're
   // in. A failed image is just skipped -- that card keeps its icon.
   loadArtwork() {
-    const pending = this.cards.filter((card) => card.imageUrl && !this.textures.exists(artKey(card)));
-    if (pending.length === 0) return;
-
-    this.load.setCORS("anonymous"); // Storage URLs are on another origin
-    for (const card of pending) this.load.image(artKey(card), card.imageUrl);
-    this.load.on("loaderror", (file) => console.warn(`[gallery] Couldn't load artwork for "${file.key}" (${file.url})`));
-    this.load.once("complete", () => {
-      if (this.sys.isActive()) this.render();
-    });
-    this.load.start();
+    loadCardArt(this, this.cards, () => this.render());
   }
 
   // --- drawing -------------------------------------------------------------

@@ -152,6 +152,10 @@ export function allCards() {
   return [...getCatalog().cards.values()];
 }
 
+export function findCardById(id) {
+  return getCatalog().cards.get(id) ?? null;
+}
+
 // Which classes start with this card, and how many copies:
 // [{ classDef, copies }]. Used by the card gallery.
 export function deckEntriesForCard(cardId) {

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#2f6f8f"/>
+      <stop offset="1" stop-color="#081a25"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#a8e1ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#a8e1ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.6"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f6fa"/>
+      <stop offset="0.55" stop-color="#b8c0cd"/>
+      <stop offset="1" stop-color="#7d8697"/>
+    </linearGradient>
+    <linearGradient id="fireOuter" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff4d1a"/>
+      <stop offset="0.6" stop-color="#ff9d4d"/>
+      <stop offset="1" stop-color="#ffd23f"/>
+    </linearGradient>
+    <linearGradient id="fireInner" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ffe066"/>
+      <stop offset="1" stop-color="#fffbe6"/>
+    </linearGradient>
+    <linearGradient id="fireShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd29a"/>
+      <stop offset="1" stop-color="#c7612a"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="360" fill="url(#bg)"/>
+  <circle cx="240" cy="180" r="170" fill="url(#halo)"/>
+  <g opacity="0.12" stroke="#ffffff" stroke-width="2" fill="none">
+    <circle cx="240" cy="180" r="120"/><circle cx="240" cy="180" r="150"/>
+  </g>
+  <g opacity="0.75"><rect x="30" y="40" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="110" y="40" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="190" y="40" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="270" y="40" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="350" y="40" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="430" y="40" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="510" y="40" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="-10" y="88" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="70" y="88" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="150" y="88" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="230" y="88" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="310" y="88" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="390" y="88" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="470" y="88" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="30" y="136" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="110" y="136" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="190" y="136" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="270" y="136" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="350" y="136" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="430" y="136" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="510" y="136" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="-10" y="184" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="70" y="184" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="150" y="184" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="230" y="184" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="310" y="184" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="390" y="184" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="470" y="184" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="30" y="232" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="110" y="232" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="190" y="232" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="270" y="232" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="350" y="232" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="430" y="232" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="510" y="232" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="-10" y="280" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="70" y="280" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="150" y="280" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="230" y="280" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="310" y="280" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="390" y="280" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/><rect x="470" y="280" width="74" height="42" rx="4" fill="#6f7888" stroke="#1b1f2c" stroke-width="4"/></g>
+      <rect x="0" y="0" width="480" height="360" fill="url(#vignette)"/>
+      
+  <g transform="translate(240 178) scale(1.2)">
+    <path d="M-62 -84 Q0 -104 62 -84 L62 -8 C62 44 28 78 0 96 C-28 78 -62 44 -62 -8 Z" fill="url(#metal)" stroke="#1b1f2c" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M-44 -70 Q0 -84 44 -70 L44 -8 C44 32 20 58 0 72 C-20 58 -44 32 -44 -8 Z" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="4"/>
+  </g>
+      <path d="M200 150 H280 M200 190 H280 M240 110 V250" stroke="#1b1f2c" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+      <g fill="#1b1f2c"><circle cx="190" cy="120" r="7"/><circle cx="290" cy="120" r="7"/><circle cx="240" cy="258" r="7"/></g>
+  <rect width="480" height="360" fill="url(#vignette)"/>
+</svg>

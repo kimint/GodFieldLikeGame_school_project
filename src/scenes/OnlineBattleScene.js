@@ -15,6 +15,7 @@ import {
   submitAction,
   watchMatch,
 } from "../online/matchApi.js";
+import { confirmDialog } from "../ui/dialog.js";
 
 export class OnlineBattleScene extends BattleScene {
   constructor() {
@@ -53,7 +54,7 @@ export class OnlineBattleScene extends BattleScene {
   }
 
   canAct() {
-    return !isBattleOver(this.battle) && !this.battle.myReady && !this.submitting && !this.pendingPick;
+    return super.canAct() && !this.battle.myReady && !this.submitting && !this.pendingPick;
   }
 
   commitAction(action) {
@@ -74,10 +75,18 @@ export class OnlineBattleScene extends BattleScene {
       });
   }
 
-  onLeave() {
-    const inProgress = !isBattleOver(this.battle);
-    if (inProgress && !window.confirm("Leave this match? It counts as a loss.")) return;
-    if (inProgress) leaveMatch(this.matchId).catch(() => {});
+  async onLeave() {
+    if (!isBattleOver(this.battle)) {
+      const leave = await confirmDialog({
+        title: "Leave this match?",
+        message: "It counts as a loss.",
+        confirmLabel: "Leave",
+        danger: true,
+      });
+      if (!leave || !this.sys.isActive()) return;
+      // The match may have ended while the dialog was open.
+      if (!isBattleOver(this.battle)) leaveMatch(this.matchId).catch(() => {});
+    }
     this.scene.start("ClassSelectScene");
   }
 
@@ -130,11 +139,20 @@ export class OnlineBattleScene extends BattleScene {
     }
     if (isStale()) return;
 
+    const previous = this.battle;
+    const before = this.currentHp();
     this.version = versionOf(match);
     this.battle = buildBattleView(match, hand, this.userId);
     if (!this.battle.myReady && !this.submitting) this.pendingPick = null;
     if (match.status === "finished") this.stopWatching();
-    this.render();
+
+    // Replay the round if this update is the one that resolved it (not, say,
+    // the opponent leaving).
+    const resolvedRound = this.battle.player.lastAction?.round;
+    const justResolved =
+      resolvedRound === previous.round && (this.battle.round > previous.round || (isBattleOver(this.battle) && !isBattleOver(previous)));
+    if (justResolved) this.presentRound(before);
+    else this.render();
   }
 }
 

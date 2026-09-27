@@ -62,6 +62,21 @@ describe("battle engine", () => {
     expect(isBattleOver(battle)).toBe(true);
   });
 
+  it("records each fighter's action for the round recap", () => {
+    const [a, b] = allClasses();
+    const battle = createBattle(a, b);
+    const card = battle.player.hand[0];
+    playRound(battle, cardAction(battle.player, card.id));
+
+    expect(battle.player.lastAction).toMatchObject({ round: 1, kind: "card", cardId: card.cardId, name: card.name });
+    expect(battle.player.lastAction.damage === null).toBe(card.category !== "attack");
+    expect(battle.player.lastAction.guard === null).toBe(card.category !== "defend");
+    expect(battle.cpu.lastAction.round).toBe(1);
+
+    const restored = deserializeBattle(JSON.parse(JSON.stringify(serializeBattle(battle))));
+    expect(restored.player.lastAction).toEqual(battle.player.lastAction);
+  });
+
   it("survives serialize -> JSON -> deserialize", () => {
     const [a, b] = allClasses();
     const battle = createBattle(a, b);

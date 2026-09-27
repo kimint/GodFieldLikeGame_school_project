@@ -1,8 +1,7 @@
 # GodFieldLikeGame_school_project
 
 A card battle game prototype based on the browser game [Godfield](https://godfield.net/).
-There's no illustrated artwork — each card has a small hand-drawn SVG icon (see "Card art" below)
-plus a category and some numbers. Classes have their own stats, a synergy that gets stronger the
+Each card has a simple SVG illustration (see "Card art" below) plus a category and some numbers. Classes have their own stats, a synergy that gets stronger the
 more you lean into it, and an ultimate that charges up over time. See
 [docs/DESIGN.md](docs/DESIGN.md) for the full design notes this is built from.
 
@@ -156,6 +155,40 @@ showing their category icon, as does any card whose image fails to load. `image_
 - a path served by the site itself, e.g. `/cards/shield_bash.png` for a file at
   `public/cards/shield_bash.png`.
 
+Every current card has an illustration in `card-art/*.svg`, generated from
+`scripts/card-art.js` (one emblem per card id, plus a generic per-category emblem for cards
+without one). Edit the script, then:
+
+```bash
+npm run cards:art                 # regenerate card-art/*.svg
+npm run cards:art -- --upload     # ...and upload them to the card-images bucket + set cards.image_url
+```
+
+Uploading needs the project's secret key in `.env.local` (gitignored) as
+`SUPABASE_SERVICE_ROLE_KEY=...` — never in `.env` or anything under `src/`. Artwork shows up in
+the gallery, on hand cards, and in the round recap.
+
+## Round recap (animation + sound)
+
+When a round resolves, the battle screen replays it before handing control back
+(`src/scenes/roundRecap.js`): each side's card flies out of its panel, then an effect per card
+type — a projectile, hit flash and floating damage number for attacks (HP bars count down as hits
+land, and a "Shield −5 · DEF −2" note shows what the target's defend card and resistance soaked
+up), a big "GUARD +5" with shield rings for defends, rising/falling sparks for buffs/debuffs, a
+screen flash for ultimates — and a victory/defeat banner at the end. Steps follow the engine's own order (both
+sides' defend/buff/debuff cards, then both sides' attacks). Click during the recap to fast-forward.
+
+Sound effects are synthesized in the browser with Web Audio (`src/fx/sound.js`), so there are no
+audio files. The **Sound** button at the top right mutes them; the choice is remembered per browser.
+
+While a defend card is up, that fighter's panel gets a pulsing blue frame, a "GUARD +5" badge,
+and the matching resistance chip (DEF for physical, MR for magic, ER for element) turns blue with
+the guard amount. Any stat above or below the class's base value is outlined green or red.
+
+The recap reads each fighter's `lastAction`, which `resolveRound()` records and the server
+includes in the public match state — so online matches need the `game` function redeployed
+(`npx supabase functions deploy game`) before they show it; until then they just skip the recap.
+
 ## File layout
 
 | Path | Purpose |
@@ -168,6 +201,12 @@ showing their category icon, as does any card whose image fails to load. `image_
 | `src/scenes/OnlineBattleScene.js` | Online battle screen — `BattleScene`'s drawing, fed by the server instead of a local engine |
 | `src/online/matchApi.js` | Supabase client for online PvP (see "Online PvP" above) |
 | `supabase/` | Supabase config, database migrations, and the `game` Edge Function |
+| `src/scenes/roundRecap.js` | End-of-round animation + sound effects (see "Round recap" above) |
+| `src/scenes/cardFace.js` | Draws one card (art/icon, name, effect text) — hand and recap |
+| `src/cardArt.js` | Loads `cards.image_url` artwork into Phaser textures |
+| `src/fx/sound.js` | Synthesized sound effects + mute switch |
+| `src/ui/dialog.js` | Centered in-page popups (join-room code, leave-match confirm) instead of `window.prompt`/`confirm` |
+| `scripts/card-art.js`, `card-art/` | Card illustrations (SVG) and their generator/uploader |
 | `src/scenes/theme.js` | Shared colors/fonts + small draw helpers (`roundedRect`, `createButton`) |
 | `src/icons.js` | Small hand-authored SVG icon per card category (+ a damage-type accent dot) — see "Card art" below |
 | `src/phaserIcons.js` | Loads `src/icons.js`'s SVG markup as Phaser textures — see "Architecture" below |

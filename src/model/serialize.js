@@ -28,6 +28,7 @@ export function serializeFighter(fighter, { includePrivate = false } = {}) {
     disabledSynergyTimers: fighter.disabledSynergyTimers,
     handCount: fighter.hand.length,
     deckCount: fighter.deck.length,
+    lastAction: fighter.lastAction ?? null,
   };
   if (includePrivate) {
     data.hand = fighter.hand;
@@ -56,6 +57,9 @@ export function deserializeFighter(data, hand = data.hand ?? []) {
     tempModifiers: data.tempModifiers,
     disabledSynergies: new Set(data.disabledSynergies),
     disabledSynergyTimers: data.disabledSynergyTimers,
+    lastAction: data.lastAction ?? null,
+    // Only meaningful on a public fighter, whose hand/deck aren't sent.
+    handCount: data.handCount ?? hand.length,
   };
 }
 

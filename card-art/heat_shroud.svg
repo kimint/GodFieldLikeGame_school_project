@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#2f6f8f"/>
+      <stop offset="1" stop-color="#081a25"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#a8e1ff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#a8e1ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.6"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f6fa"/>
+      <stop offset="0.55" stop-color="#b8c0cd"/>
+      <stop offset="1" stop-color="#7d8697"/>
+    </linearGradient>
+    <linearGradient id="fireOuter" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ff4d1a"/>
+      <stop offset="0.6" stop-color="#ff9d4d"/>
+      <stop offset="1" stop-color="#ffd23f"/>
+    </linearGradient>
+    <linearGradient id="fireInner" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#ffe066"/>
+      <stop offset="1" stop-color="#fffbe6"/>
+    </linearGradient>
+    <linearGradient id="fireShield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd29a"/>
+      <stop offset="1" stop-color="#c7612a"/>
+    </linearGradient>
+  </defs>
+  <rect width="480" height="360" fill="url(#bg)"/>
+  <circle cx="240" cy="180" r="170" fill="url(#halo)"/>
+  <g opacity="0.12" stroke="#ffffff" stroke-width="2" fill="none">
+    <circle cx="240" cy="180" r="120"/><circle cx="240" cy="180" r="150"/>
+  </g>
+  
+    <path d="M60 300 C60 120 160 60 240 60 C320 60 420 120 420 300 Z" fill="#ff9d4d" opacity="0.18" stroke="#ffb870" stroke-width="8"/>
+    <path d="M100 300 C100 160 170 100 240 100 C310 100 380 160 380 300" fill="none" stroke="#ffd29a" stroke-width="5" stroke-dasharray="18 12" opacity="0.8"/>
+    <g fill="none" stroke="#ffd29a" stroke-width="7" stroke-linecap="round" opacity="0.9">
+      <path d="M150 260 q15 -20 0 -40 q-15 -20 0 -40"/>
+      <path d="M330 260 q15 -20 0 -40 q-15 -20 0 -40"/>
+    </g>
+    
+  <g transform="translate(240 205) scale(0.8)">
+    <path d="M-62 -84 Q0 -104 62 -84 L62 -8 C62 44 28 78 0 96 C-28 78 -62 44 -62 -8 Z" fill="url(#fireShield)" stroke="#1b1f2c" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M-44 -70 Q0 -84 44 -70 L44 -8 C44 32 20 58 0 72 C-20 58 -44 32 -44 -8 Z" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="4"/>
+  </g>
+    
+  <g transform="translate(240 205) rotate(0) scale(0.55)">
+    <path d="M0 -70 C22 -38 44 -18 38 14 C33 42 16 58 0 58 C-16 58 -33 42 -38 14 C-42 -8 -22 -24 -12 -46 C-6 -30 2 -26 6 -20 C8 -38 4 -54 0 -70 Z" fill="url(#fireOuter)"/>
+    <path d="M0 -24 C12 -6 20 6 18 22 C16 38 8 46 0 46 C-8 46 -16 38 -18 24 C-20 10 -10 0 -4 -10 C0 -2 4 0 6 2 C6 -8 4 -16 0 -24 Z" fill="url(#fireInner)"/>
+  </g>
+    <path d="M40 300 H440" stroke="#1b1f2c" stroke-width="8" stroke-linecap="round"/>
+  <rect width="480" height="360" fill="url(#vignette)"/>
+</svg>

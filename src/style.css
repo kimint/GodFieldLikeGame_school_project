@@ -17,3 +17,107 @@ body {
 #game {
   line-height: 0;
 }
+
+/* Modal dialogs from src/ui/dialog.js (join-room code, leave-match
+   confirmation), centered over the canvas. Colors match src/scenes/theme.js. */
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 12, 20, 0.6);
+  animation: dialog-fade 120ms ease-out;
+}
+
+.dialog-box {
+  width: min(360px, 100%);
+  padding: 22px 22px 18px;
+  border-radius: 14px;
+  background: #2a2f42;
+  border: 1px solid #4a5573;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  color: #e8eaf0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.4;
+  animation: dialog-pop 160ms ease-out;
+}
+
+.dialog-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.dialog-message {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: #a9adc1;
+}
+
+.dialog-input {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #4a5573;
+  background: #1b1f2c;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-align: center;
+  outline: none;
+}
+
+.dialog-input:focus {
+  border-color: #c49b3a;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialog-button {
+  min-width: 88px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #4a5573;
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dialog-button:hover {
+  background: #586694;
+}
+
+.dialog-button-primary {
+  background: #a8842f;
+}
+
+.dialog-button-primary:hover {
+  background: #c49b3a;
+}
+
+.dialog-button-danger {
+  background: #b5423a;
+}
+
+.dialog-button-danger:hover {
+  background: #cc5047;
+}
+
+@keyframes dialog-fade {
+  from { opacity: 0; }
+}
+
+@keyframes dialog-pop {
+  from { opacity: 0; transform: scale(0.95); }
+}
