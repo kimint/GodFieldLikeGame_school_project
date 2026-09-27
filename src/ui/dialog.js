@@ -79,6 +79,15 @@ function openDialog({ title, message, input, confirmLabel, cancelLabel = "Cancel
       event.stopPropagation();
     };
 
+    // Phaser listens for presses on the whole window (to track ones that start
+    // outside the canvas), so without this a click on the dialog would also
+    // press whatever game button sits underneath it -- e.g. "Cancel" landing
+    // on "Create online room". Stopping presses here keeps them out of the
+    // game; the dialog's own click handlers still run.
+    for (const type of ["pointerdown", "mousedown", "touchstart"]) {
+      backdrop.addEventListener(type, (event) => event.stopPropagation());
+    }
+
     ok.addEventListener("click", confirm);
     cancel.addEventListener("click", () => close(field ? null : false));
     backdrop.addEventListener("pointerdown", (event) => {
