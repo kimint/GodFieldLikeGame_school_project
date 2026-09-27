@@ -1,15 +1,17 @@
 // End-of-round recap: replays what each fighter did in the round that just
 // resolved -- their card flies out, then an effect per card type (a
 // projectile + hit for attacks, a shield ring for defends, rising sparks for
-// buffs, a curse for debuffs, a screen flash for ultimates) -- with
-// synthesized sound effects (src/fx/sound.js).
+// buffs, a curse for debuffs, a class-specific cut-in and effect for
+// ultimates, see ultimateFx.js) -- with synthesized sound effects
+// (src/fx/sound.js).
 //
 // Driven entirely by each fighter's `lastAction` (see recordAction in
 // engine.js), so it works the same for vs-CPU and online battles. Steps
 // play in the engine's own resolution order: both sides' defend/buff/debuff
 // cards first, then both sides' attacks/ultimates.
 //
-// Clicking anywhere during the recap fast-forwards it.
+// It plays at the viewer's chosen speed (setRecapSpeed, the battle screen's
+// speed button); clicking anywhere during the recap fast-forwards it.
 
 import Phaser from "phaser";
 import { CARD_ICON_KEY } from "../phaserIcons.js";
@@ -17,6 +19,8 @@ import { playSfx } from "../fx/sound.js";
 import { MODIFIER_MODE } from "../model/effects.js";
 import { COLORS, TEXT, FONT_FAMILY } from "./theme.js";
 import { drawCardFace } from "./cardFace.js";
+import { burstParticles, fmt, hex, projectile, tween, wait } from "./recapUtil.js";
+import { playUltimate } from "./ultimateFx.js";
 
 const CARD_W = 124;
 const CARD_H = 176;
@@ -28,11 +32,7 @@ const EFFECT_COLOR = {
   defend: 0x6ec6ff,
   buff: 0x6be39a,
   debuff: 0xb98cff,
-  ultimate: 0xffd23f,
 };
-
-const hex = (color) => `#${color.toString(16).padStart(6, "0")}`;
-const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 /**
  * @param scene   the battle scene
@@ -42,16 +42,18 @@ const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
  *   sides: { player, cpu }, each {
  *     action,                             -- the fighter's lastAction
  *     who,                                -- "You" / "CPU" / "Opponent"
- *     ultimateName,
+ *     classId, className, ultimateName,
  *     hp,                                 -- HP shown before this round
  *     panel: () => ({ x, y, w, h, container, setHp }),
  *   },
- *   outcome: null | { text, color, sfx }  -- shown last, when the game ended
+ *   speed,                                -- playback speed, 1 = normal
  * }
  */
 export async function playRoundRecap(scene, recap) {
   const layer = scene.add.container(0, 0);
   const run = { scene, recap, layer, skipping: false };
+  scene.recapRun = run;
+  applySpeed(scene, recap.speed ?? 1);
 
   const { y: stageY, h: stageH } = recap.stage;
   const overlay = scene.add.rectangle(0, stageY, 960, stageH, COLORS.background, 0.86).setOrigin(0, 0);
@@ -71,12 +73,22 @@ export async function playRoundRecap(scene, recap) {
   for (const key of ["player", "cpu"]) if (dealsDamage(recap.sides[key].action)) order.push(key);
   for (const key of order) await playStep(run, key);
 
-  if (recap.outcome) await outcomeBanner(run, recap.outcome);
-
   await tween(run, { targets: layer, alpha: 0, duration: 200 });
   layer.destroy(true);
-  scene.tweens.timeScale = 1;
-  scene.time.timeScale = 1;
+  scene.recapRun = null;
+  applySpeed(scene, 1);
+}
+
+// Change the speed of a recap that's playing (no-op if none is, or if it's
+// already being fast-forwarded).
+export function setRecapSpeed(scene, speed) {
+  const run = scene.recapRun;
+  if (run && !run.skipping) applySpeed(scene, speed);
+}
+
+function applySpeed(scene, speed) {
+  scene.tweens.timeScale = speed;
+  scene.time.timeScale = speed;
 }
 
 function dealsDamage(action) {
@@ -86,18 +98,7 @@ function dealsDamage(action) {
 function skip(run) {
   if (run.skipping) return;
   run.skipping = true;
-  run.scene.tweens.timeScale = SKIP_SPEED;
-  run.scene.time.timeScale = SKIP_SPEED;
-}
-
-// --- promise helpers ---------------------------------------------------------
-
-function tween(run, config) {
-  return new Promise((resolve) => run.scene.tweens.add({ ...config, onComplete: () => resolve() }));
-}
-
-function wait(run, ms) {
-  return new Promise((resolve) => run.scene.time.delayedCall(ms, resolve));
+  applySpeed(run.scene, Math.max(SKIP_SPEED, run.scene.tweens.timeScale));
 }
 
 // --- banners -------------------------------------------------------------------
@@ -122,29 +123,6 @@ async function roundBanner(run) {
   await wait(run, 350);
   await tween(run, { targets: text, alpha: 0, y: cy - 20, duration: 180 });
   text.destroy();
-}
-
-async function outcomeBanner(run, outcome) {
-  const { scene, recap, layer } = run;
-  const cy = recap.stage.y + recap.stage.h / 2;
-  const bar = scene.add.rectangle(480, cy, 960, 96, 0x000000, 0.6).setScale(1, 0);
-  const text = scene.add
-    .text(480, cy, outcome.text, {
-      fontFamily: FONT_FAMILY,
-      fontSize: "48px",
-      fontStyle: "800",
-      color: hex(outcome.color),
-      stroke: "#000000",
-      strokeThickness: 7,
-    })
-    .setOrigin(0.5)
-    .setScale(1.6)
-    .setAlpha(0);
-  layer.add([bar, text]);
-  playSfx(outcome.sfx);
-  await tween(run, { targets: bar, scaleY: 1, duration: 180 });
-  await tween(run, { targets: text, scale: 1, alpha: 1, duration: 300, ease: "Back.easeOut" });
-  await wait(run, 1300);
 }
 
 // --- one fighter's action ----------------------------------------------------
@@ -213,12 +191,8 @@ async function playEffect(run, side, target, action, from) {
   if (action.kind === "none") return { text: "Nothing to play", color: 0xa9adc1 };
 
   if (action.kind === "ultimate") {
-    run.scene.cameras.main.flash(250, 255, 210, 90);
-    run.scene.cameras.main.shake(350, 0.008);
-    playSfx("ultimate");
-    await bigText(run, "ULTIMATE!", EFFECT_COLOR.ultimate);
-    await projectile(run, from, target.panel(), EFFECT_COLOR.ultimate, 18);
-    return hit(run, target, action);
+    await playUltimate(run, side, target, from);
+    return hit(run, target, action, { quiet: true });
   }
 
   switch (action.category) {
@@ -257,47 +231,8 @@ function accentFor(action) {
 
 // --- effect pieces -----------------------------------------------------------
 
-async function bigText(run, message, color) {
-  const { scene, recap, layer } = run;
-  const text = scene.add
-    .text(480, recap.stage.y + 40, message, {
-      fontFamily: FONT_FAMILY,
-      fontSize: "44px",
-      fontStyle: "800",
-      color: hex(color),
-      stroke: "#000000",
-      strokeThickness: 7,
-    })
-    .setOrigin(0.5)
-    .setScale(2)
-    .setAlpha(0);
-  layer.add(text);
-  await tween(run, { targets: text, scale: 1, alpha: 1, duration: 260, ease: "Cubic.easeOut" });
-  scene.tweens.add({ targets: text, alpha: 0, delay: 500, duration: 250, onComplete: () => text.destroy() });
-}
-
-async function projectile(run, from, panel, color, radius) {
-  const { scene, layer } = run;
-  const to = { x: panel.x + panel.w / 2, y: panel.y + panel.h / 2 };
-  const orb = scene.add.circle(from.x, from.y, radius, color).setStrokeStyle(3, 0xffffff);
-  layer.add(orb);
-
-  // A fading trail behind the orb.
-  const trail = scene.time.addEvent({
-    delay: 25,
-    loop: true,
-    callback: () => {
-      const dot = scene.add.circle(orb.x, orb.y, radius * 0.7, color, 0.6);
-      layer.add(dot);
-      scene.tweens.add({ targets: dot, alpha: 0, scale: 0.2, duration: 260, onComplete: () => dot.destroy() });
-    },
-  });
-  await tween(run, { targets: orb, x: to.x, y: to.y, duration: 380, ease: "Quad.easeIn" });
-  trail.remove();
-  orb.destroy();
-}
-
-function hit(run, target, action) {
+// `quiet`: skip the impact sound/particles (an ultimate already did its own).
+function hit(run, target, action, { quiet = false } = {}) {
   const { scene, layer } = run;
   const damage = action.damage ?? 0;
   const guarded = action.guarded ?? 0;
@@ -308,23 +243,9 @@ function hit(run, target, action) {
   const blocked = damage <= 0;
   const color = blocked ? EFFECT_COLOR.block : EFFECT_COLOR.hit;
 
-  playSfx(blocked ? "block" : "hit");
-
-  // Burst of particles from the impact point.
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2;
-    const dist = Phaser.Math.Between(40, 80);
-    const p = scene.add.circle(cx, cy, Phaser.Math.Between(3, 6), color);
-    layer.add(p);
-    scene.tweens.add({
-      targets: p,
-      x: cx + Math.cos(angle) * dist,
-      y: cy + Math.sin(angle) * dist,
-      alpha: 0,
-      duration: 420,
-      ease: "Cubic.easeOut",
-      onComplete: () => p.destroy(),
-    });
+  if (!quiet) {
+    playSfx(blocked ? "block" : "hit");
+    burstParticles(run, cx, cy, { colors: [color] });
   }
 
   // Flash the panel and shake it.

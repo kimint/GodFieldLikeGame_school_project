@@ -104,6 +104,37 @@ const SFX = {
     noise(ac, { start: 0.45, duration: 0.9, volume: 0.5, from: 4000, to: 120 });
     tone(ac, { type: "sine", from: 90, to: 30, start: 0.45, duration: 0.9, volume: 0.6 });
   },
+  // Ultimate cut-in banner: a whoosh into a bright chord stab.
+  cutin: (ac) => {
+    noise(ac, { duration: 0.35, volume: 0.25, filter: "bandpass", from: 400, to: 6000 });
+    [523, 659, 784, 1047].forEach((f) => tone(ac, { type: "sawtooth", from: f, start: 0.12, duration: 0.5, volume: 0.035 }));
+    tone(ac, { type: "sine", from: 130, to: 110, start: 0.12, duration: 0.6, volume: 0.25 });
+  },
+  // Guardian ultimate: a falling whistle, then a heavy metallic crash.
+  guardianDrop: (ac) => {
+    tone(ac, { type: "sine", from: 1400, to: 260, duration: 0.42, volume: 0.12 });
+    noise(ac, { duration: 0.42, volume: 0.12, filter: "bandpass", from: 3000, to: 500 });
+  },
+  guardianImpact: (ac) => {
+    tone(ac, { type: "sine", from: 80, to: 22, duration: 1.1, volume: 0.75 });
+    noise(ac, { duration: 0.9, volume: 0.55, from: 2500, to: 80 });
+    [1760, 2350, 3100].forEach((f, i) => tone(ac, { type: "triangle", from: f, to: f * 0.98, start: 0.01 * i, duration: 1.3, volume: 0.07 }));
+  },
+  // Pyromancer ultimate: a rising roar while charging, then a crackling blast.
+  pyroCharge: (ac) => {
+    noise(ac, { duration: 1.0, volume: 0.3, filter: "bandpass", from: 180, to: 2600 });
+    tone(ac, { type: "sawtooth", from: 70, to: 260, duration: 1.0, volume: 0.07 });
+  },
+  pyroExplode: (ac) => {
+    tone(ac, { type: "sine", from: 70, to: 20, duration: 1.2, volume: 0.7 });
+    noise(ac, { duration: 1.3, volume: 0.6, from: 6000, to: 120 });
+    for (let i = 0; i < 10; i++) {
+      noise(ac, { start: 0.1 + Math.random() * 0.9, duration: 0.05, volume: 0.25, filter: "highpass", from: 2500 });
+    }
+  },
+  draw: (ac) => {
+    [440, 440, 392].forEach((f, i) => tone(ac, { type: "triangle", from: f, start: i * 0.2, duration: 0.4, volume: 0.13 }));
+  },
   victory: (ac) => {
     [523, 659, 784, 1047].forEach((f, i) => tone(ac, { type: "triangle", from: f, start: i * 0.12, duration: 0.4, volume: 0.15 }));
   },

@@ -174,9 +174,21 @@ When a round resolves, the battle screen replays it before handing control back
 (`src/scenes/roundRecap.js`): each side's card flies out of its panel, then an effect per card
 type — a projectile, hit flash and floating damage number for attacks (HP bars count down as hits
 land, and a "Shield −5 · DEF −2" note shows what the target's defend card and resistance soaked
-up), a big "GUARD +5" with shield rings for defends, rising/falling sparks for buffs/debuffs, a
-screen flash for ultimates — and a victory/defeat banner at the end. Steps follow the engine's own order (both
-sides' defend/buff/debuff cards, then both sides' attacks). Click during the recap to fast-forward.
+up), a big "GUARD +5" with shield rings for defends, rising/falling sparks for buffs/debuffs.
+Steps follow the engine's own order (both sides' defend/buff/debuff cards, then both sides'
+attacks). The **Speed** button at the top right sets the playback speed (1x / 1.5x / 2x / 3x,
+remembered per browser, applies even mid-replay); clicking during the recap fast-forwards it.
+
+**Ultimates** (`src/scenes/ultimateFx.js`) look and sound different from normal cards: a
+full-width cut-in banner with the class emblem and ultimate name, then a per-class effect —
+Guardian drops a giant gold crest that slams the target (light column, shockwave rings, debris,
+metallic crash), Pyromancer charges a fireball that arcs across the screen and explodes into flame
+pillars (heat haze, roar, crackling blast). A class without an entry in `THEMES` there gets a
+generic gold effect, so adding a class never breaks the recap.
+
+When the game ends, a **VICTORY / DEFEAT / DRAW** screen appears in the middle of the screen
+(rays and confetti for a win), with the final HP, a Play again / Back to menu button, and "View
+board" to close it and look at the final state.
 
 Sound effects are synthesized in the browser with Web Audio (`src/fx/sound.js`), so there are no
 audio files. The **Sound** button at the top right mutes them; the choice is remembered per browser.
@@ -202,6 +214,8 @@ includes in the public match state — so online matches need the `game` functio
 | `src/online/matchApi.js` | Supabase client for online PvP (see "Online PvP" above) |
 | `supabase/` | Supabase config, database migrations, and the `game` Edge Function |
 | `src/scenes/roundRecap.js` | End-of-round animation + sound effects (see "Round recap" above) |
+| `src/scenes/ultimateFx.js` | Per-class ultimate cut-in and effects |
+| `src/scenes/recapUtil.js` | Small animation helpers shared by the recap and ultimate effects |
 | `src/scenes/cardFace.js` | Draws one card (art/icon, name, effect text) — hand and recap |
 | `src/cardArt.js` | Loads `cards.image_url` artwork into Phaser textures |
 | `src/fx/sound.js` | Synthesized sound effects + mute switch |

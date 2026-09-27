@@ -26,10 +26,10 @@ import { RESIST_STAT } from "../model/damageTypes.js";
 import { allCards, allClasses } from "../model/catalog.js";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY } from "../phaserIcons.js";
 import { loadCardArt } from "../cardArt.js";
-import { isMuted, setMuted } from "../fx/sound.js";
+import { isMuted, playSfx, setMuted } from "../fx/sound.js";
 import { COLORS, TEXT, FONT_FAMILY, roundedRect, createButton, useRenderScale } from "./theme.js";
 import { drawCardFace } from "./cardFace.js";
-import { playRoundRecap } from "./roundRecap.js";
+import { playRoundRecap, setRecapSpeed } from "./roundRecap.js";
 
 const PANEL_Y = 44;
 const PANEL_W = 420;
@@ -71,6 +71,34 @@ const CHIP_COLOR = {
 };
 
 const GUARD_COLOR = 0x6ec6ff;
+
+// Round-recap playback speeds the Speed button cycles through; the choice is
+// remembered per browser.
+const RECAP_SPEEDS = [1, 1.5, 2, 3];
+const RECAP_SPEED_KEY = "godfield.recapSpeed";
+
+function readRecapSpeed() {
+  try {
+    const value = Number(window.localStorage.getItem(RECAP_SPEED_KEY));
+    return RECAP_SPEEDS.includes(value) ? value : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function saveRecapSpeed(value) {
+  try {
+    window.localStorage.setItem(RECAP_SPEED_KEY, String(value));
+  } catch {
+    // storage unavailable (private window etc.) -- just don't remember it
+  }
+}
+
+const RESULT = {
+  win: { title: "VICTORY", color: 0xffd23f, sfx: "victory" },
+  lose: { title: "DEFEAT", color: 0xff5a4f, sfx: "defeat" },
+  draw: { title: "DRAW", color: 0xc9cfe0, sfx: "draw" },
+};
 
 const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const shortName = (name) => name.replace(/\s*\(.*\)\s*$/, "");
@@ -124,6 +152,20 @@ export class BattleScene extends Phaser.Scene {
     return "Restart";
   }
 
+  // The main button on the end-of-game screen (runs onLeave).
+  get resultButtonLabel() {
+    return "Play again";
+  }
+
+  // The line under VICTORY / DEFEAT / DRAW.
+  resultSubtitle() {
+    const b = this.battle;
+    const opponent = shortName(b.cpu.classDef.name);
+    if (b.draw) return "Both fighters went down at the same time.";
+    if (b.winner === b.player) return `You defeated ${this.opponentLabel} (${opponent}) in round ${b.round}.`;
+    return `${this.opponentLabel} (${opponent}) wins in round ${b.round}.`;
+  }
+
   // Whether the hand/ultimate should take clicks right now.
   canAct() {
     return !isBattleOver(this.battle) && !this.recapPlaying;
@@ -152,6 +194,9 @@ export class BattleScene extends Phaser.Scene {
     this.recapPlaying = false;
     this.shownHp = null; // { player, cpu } while a recap is counting HP down
     this.panelViews = {};
+    this.recapSpeed = readRecapSpeed();
+    this.resultLayer = null; // the end-of-game screen, once shown
+    this.resultDismissed = false; // closed with "View board"
     this.battle = this.setupBattle(data);
 
     this.events.once("shutdown", () => {
@@ -170,6 +215,21 @@ export class BattleScene extends Phaser.Scene {
       onClick: () => {
         setMuted(!isMuted());
         soundButton.container.getAt(1).setText(soundLabel());
+      },
+    });
+
+    // Speed of the end-of-round replay; takes effect immediately, even
+    // mid-replay.
+    const speedLabel = () => `Speed ${this.recapSpeed}x`;
+    const speedButton = createButton(this, 960 - 40 - 110 - 8 - 100, 12, 100, 26, speedLabel(), {
+      color: COLORS.restart,
+      hoverColor: COLORS.restartHover,
+      onClick: () => {
+        const i = RECAP_SPEEDS.indexOf(this.recapSpeed);
+        this.recapSpeed = RECAP_SPEEDS[(i + 1) % RECAP_SPEEDS.length];
+        saveRecapSpeed(this.recapSpeed);
+        setRecapSpeed(this, this.recapSpeed);
+        speedButton.container.getAt(1).setText(speedLabel());
       },
     });
 
@@ -295,6 +355,8 @@ export class BattleScene extends Phaser.Scene {
     const side = (key, fighter, who) => ({
       action: fighter.lastAction,
       who,
+      classId: fighter.classDef.id,
+      className: shortName(fighter.classDef.name),
       ultimateName: ultimateName(fighter.classDef),
       hp: before[key],
       panel: () => this.panelViews[key],
@@ -307,7 +369,7 @@ export class BattleScene extends Phaser.Scene {
         player: side("player", b.player, "You"),
         cpu: side("cpu", b.cpu, this.opponentLabel),
       },
-      outcome: this.outcome(),
+      speed: this.recapSpeed,
     }).finally(() => {
       this.recapPlaying = false;
       this.shownHp = null;
@@ -315,12 +377,144 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  outcome() {
+  // --- end-of-game screen ------------------------------------------------------
+
+  // VICTORY / DEFEAT / DRAW in the middle of the screen, over everything,
+  // once the game is over and the last round's recap has finished. "View
+  // board" closes it to look at the final state; the Restart/Leave button
+  // under the hand still works after that.
+  showResult() {
+    if (this.resultLayer || this.resultDismissed) return;
     const b = this.battle;
-    if (b.draw) return { text: "DRAW", color: 0xe8eaf0, sfx: "defeat" };
-    if (b.winner === b.player) return { text: "VICTORY!", color: 0xffd23f, sfx: "victory" };
-    if (b.winner) return { text: "DEFEAT", color: 0xff5a4f, sfx: "defeat" };
-    return null;
+    const result = b.draw ? RESULT.draw : b.winner === b.player ? RESULT.win : RESULT.lose;
+    const cx = 480;
+    const cy = 330;
+
+    const layer = this.add.container(0, 0).setDepth(1000);
+    this.resultLayer = layer;
+    const dim = this.add.rectangle(0, 0, 960, 760, 0x05070d, 0.75).setOrigin(0, 0).setInteractive();
+    layer.add(dim);
+
+    if (result === RESULT.win) {
+      // Slowly turning rays behind the title, and falling confetti.
+      const rays = this.add.graphics();
+      rays.fillStyle(result.color, 0.13);
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const spread = Math.PI / 24;
+        rays.fillTriangle(
+          0,
+          0,
+          Math.cos(a - spread) * 520,
+          Math.sin(a - spread) * 520,
+          Math.cos(a + spread) * 520,
+          Math.sin(a + spread) * 520
+        );
+      }
+      const rayHolder = this.add.container(cx, cy, [rays]).setAlpha(0);
+      layer.add(rayHolder);
+      this.tweens.add({ targets: rayHolder, alpha: 1, duration: 500 });
+      this.tweens.add({ targets: rayHolder, angle: 360, duration: 24000, repeat: -1 });
+
+      const confettiColors = [0xffd23f, 0xffffff, 0x6be39a, 0x6ec6ff, 0xff9d4d];
+      for (let i = 0; i < 60; i++) {
+        const piece = this.add
+          .rectangle(Phaser.Math.Between(0, 960), Phaser.Math.Between(-300, -10), 6, 10, confettiColors[i % confettiColors.length])
+          .setAngle(Phaser.Math.Between(0, 360));
+        layer.add(piece);
+        this.tweens.add({
+          targets: piece,
+          y: 800,
+          angle: piece.angle + Phaser.Math.Between(180, 720),
+          x: piece.x + Phaser.Math.Between(-80, 80),
+          delay: Phaser.Math.Between(0, 1500),
+          duration: Phaser.Math.Between(2200, 3600),
+          ease: "Sine.easeIn",
+          onComplete: () => piece.destroy(),
+        });
+      }
+    } else if (result === RESULT.lose) {
+      const shade = this.add.rectangle(0, 0, 960, 760, 0x5a0f0f, 0).setOrigin(0, 0);
+      layer.add(shade);
+      this.tweens.add({ targets: shade, fillAlpha: 0.25, duration: 600 });
+    }
+
+    const title = this.add
+      .text(cx, cy, result.title, {
+        fontFamily: FONT_FAMILY,
+        fontSize: "88px",
+        fontStyle: "800",
+        color: `#${result.color.toString(16).padStart(6, "0")}`,
+        stroke: "#000000",
+        strokeThickness: 10,
+      })
+      .setOrigin(0.5);
+    const subtitle = this.add
+      .text(cx, cy + 70, this.resultSubtitle(), {
+        fontFamily: FONT_FAMILY,
+        fontSize: "18px",
+        fontStyle: "700",
+        color: TEXT.white,
+        align: "center",
+        wordWrap: { width: 700 },
+      })
+      .setOrigin(0.5, 0);
+    const hp = (f) => `${Math.ceil(f.hp)}/${f.maxHp} HP`;
+    const summary = this.add
+      .text(cx, cy + 102, `You ${hp(b.player)}   ·   ${this.opponentLabel} ${hp(b.cpu)}`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: "14px",
+        color: TEXT.muted,
+      })
+      .setOrigin(0.5, 0);
+    layer.add([title, subtitle, summary]);
+
+    const primary = createButton(this, cx - 170, cy + 150, 160, 44, this.resultButtonLabel, {
+      color: COLORS.ultimate,
+      hoverColor: COLORS.ultimateHover,
+      onClick: () => this.onLeave(),
+    });
+    const secondary = createButton(this, cx + 10, cy + 150, 160, 44, "View board", {
+      color: COLORS.restart,
+      hoverColor: COLORS.restartHover,
+      onClick: () => this.hideResult(),
+    });
+    layer.add([primary.container, secondary.container]);
+
+    // Entrance: a stamp for VICTORY, a heavy drop for DEFEAT, a fade for DRAW.
+    const details = [subtitle, summary, primary.container, secondary.container];
+    details.forEach((o) => o.setAlpha(0));
+    dim.setAlpha(0);
+    this.tweens.add({ targets: dim, alpha: 1, duration: 250 });
+    if (result === RESULT.win) {
+      title.setScale(2.4).setAlpha(0);
+      this.tweens.add({ targets: title, scale: 1, alpha: 1, duration: 420, ease: "Back.easeOut" });
+      this.cameras.main.flash(250, 255, 230, 150);
+    } else if (result === RESULT.lose) {
+      title.setY(cy - 160).setAlpha(0);
+      this.tweens.add({ targets: title, y: cy, alpha: 1, duration: 520, ease: "Bounce.easeOut" });
+    } else {
+      title.setAlpha(0);
+      this.tweens.add({ targets: title, alpha: 1, duration: 500 });
+    }
+    this.tweens.add({ targets: details, alpha: 1, delay: 450, duration: 300 });
+    playSfx(result.sfx);
+  }
+
+  hideResult() {
+    this.resultDismissed = true;
+    if (!this.resultLayer) return;
+    const layer = this.resultLayer;
+    this.resultLayer = null;
+    this.tweens.add({
+      targets: layer,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => {
+        this.tweens.killTweensOf(layer.getAll());
+        layer.destroy(true);
+      },
+    });
   }
 
   // --- drawing ---------------------------------------------------------------
@@ -335,6 +529,8 @@ export class BattleScene extends Phaser.Scene {
 
     this.statusText.setText(this.statusMessage());
     this.ultimateButton.setEnabled(!locked && canUseUltimate(this.battle.player));
+
+    if (isBattleOver(this.battle) && !this.recapPlaying) this.showResult();
   }
 
   renderFighterPanel(key, container, x, fighter, label) {
