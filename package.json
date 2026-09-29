@@ -4,10 +4,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:sandbox": "vite --mode sandbox",
     "build": "vite build",
+    "build:sandbox": "vite build --mode sandbox",
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "vitest run",
+    "db:push": "npx supabase link --project-ref jwhdynpvsojlpkwfxhou && npx supabase db push",
+    "fn:deploy": "npx supabase functions deploy game --project-ref jwhdynpvsojlpkwfxhou --use-api",
     "catalog:sql": "node scripts/catalog-sql.js",
     "cards:art": "node scripts/card-art.js",
     "backgrounds": "node scripts/backgrounds.js"

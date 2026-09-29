@@ -112,16 +112,42 @@ offline), the Edge Function per instance (re-read every 5 minutes).
   upsert SQL (that's how `*_seed_game_catalog.sql` was made).
 
 After changing anything under `supabase/` (or `src/model/`, which the function bundles), push it
-from the repo root, logged in with `npx supabase login` and linked with
-`npx supabase link --project-ref vygltqnmontwxyyeyfyb`:
+from the repo root, logged in with `npx supabase login`. **Pushes go to the sandbox (dev)
+project by default**:
 
 ```bash
-npx supabase db push                  # apply new migrations
-npx supabase functions deploy game    # redeploy the server
+npm run db:push      # link the sandbox project and apply new migrations there
+npm run fn:deploy    # redeploy the server on the sandbox project
 ```
 
-The project also needs **Authentication → Sign In / Providers → Allow anonymous sign-ins** turned
+Both projects need **Authentication → Sign In / Providers → Allow anonymous sign-ins** turned
 on in the Supabase dashboard (a one-time setting).
+
+### Sandbox project (separate dev database)
+
+A second Supabase project (`jwhdynpvsojlpkwfxhou`, values in `.env.sandbox`) is where table /
+data / Edge Function changes are tried out, so the main project (`vygltqnmontwxyyeyfyb`, in
+`.env`) is left alone.
+
+```bash
+npm run dev:sandbox      # local dev server against the sandbox project
+npm run build:sandbox    # production build against the sandbox project
+```
+
+`npm run dev` and `npm run build` still use the main project in `.env`.
+
+**Pushing to the main project** is deliberately manual. Only do it once a change works on the
+sandbox, and link back to the sandbox afterwards:
+
+```bash
+npx supabase link --project-ref vygltqnmontwxyyeyfyb
+npx supabase db push
+npx supabase functions deploy game --project-ref vygltqnmontwxyyeyfyb --use-api
+npx supabase link --project-ref jwhdynpvsojlpkwfxhou
+```
+
+Card art (`npm run cards:art`) uploads to the project in `.env`, so sandbox cards show the
+built-in category icons until art is uploaded there too.
 
 ## Card art
 
