@@ -12,13 +12,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1e2230;
+  /* Letterbox surround is replaced by .ambient-bg below; keep a flat
+     fallback color if the artwork fails to load. */
+  background-color: #1e2230;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: #e8eaf0;
 }
 
 #root {
-  width: min(1000px, 100%);
+  width: 100%;
+  max-width: 1920px;
   padding: 16px;
 }
 
@@ -27,8 +30,33 @@ body {
   line-height: 0;
 }
 
+/* The Scale Manager measures this box, so it must be viewport-sized -- an
+   auto-height mount makes FIT converge on a too-small canvas. */
+.phaser-mount {
+  width: 100%;
+  height: calc(100vh - 32px);
+  height: calc(100dvh - 32px);
+  min-height: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .phaser-mount canvas {
   max-width: 100%;
+  max-height: 100%;
+}
+
+/* Full-viewport ambient extension of the battle hall: cover, blurred and
+   darkened, scaled slightly past the edges so the blur never shows a seam.
+   Letterbox margins read as out-of-focus scene depth instead of flat color. */
+.ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url("/backgrounds/battle.svg") center / cover no-repeat #1e2230;
+  filter: blur(10px) brightness(0.55);
+  transform: scale(1.06);
 }
 
 /* --- React shell screens ------------------------------------------- */

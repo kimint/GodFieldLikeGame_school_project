@@ -97,6 +97,10 @@ export class OnlineBattleScene extends BattleScene {
   }
 
   override commitAction(action: Action): void {
+    this.previewedCardId = null;
+    this.previewedView = null;
+    this.dismissTween?.stop();
+    this.dismissTween = null;
     this.submitting = true;
     this.errorMessage = null;
     this.pendingPick = action.kind === "card" ? action.card.name : "your ultimate";
@@ -106,6 +110,9 @@ export class OnlineBattleScene extends BattleScene {
       .catch((err: Error) => {
         this.errorMessage = err.message;
         this.pendingPick = null;
+        // The round never resolved: drop the pending slots (the flight, if
+        // any, already landed or was superseded -- its guards no-op).
+        this.pendingPlay = null;
       })
       .finally(() => {
         this.submitting = false;
@@ -115,6 +122,9 @@ export class OnlineBattleScene extends BattleScene {
   }
 
   override async onLeave(): Promise<void> {
+    // Abandon any commit flight first (same guard as the base onLeave).
+    this.flightSeq++;
+    this.finishFlight();
     if (!isBattleOver(this.battle)) {
       const leave = await confirmDialog({
         title: "Leave this match?",

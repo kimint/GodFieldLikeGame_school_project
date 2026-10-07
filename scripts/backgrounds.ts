@@ -3,7 +3,7 @@
 //
 //   npm run backgrounds    writes public/backgrounds/{class-select,battle}.svg
 //
-// Both are 960x760, the game's layout size, and kept dark where the UI sits
+// Both are 1280x720, the game's layout size, and kept dark where the UI sits
 // (panels, hand, log) so text stays readable; the detail goes where the
 // screen is empty. Randomness (stars, bricks, trees) is seeded, so
 // regenerating gives the same picture.
@@ -18,8 +18,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_DIR = join(ROOT, "public", "backgrounds");
 
-const W = 960;
-const H = 760;
+const W = 1280;
+const H = 720;
 
 // Small seeded PRNG (mulberry32).
 function rng(seed: number): () => number {
@@ -97,7 +97,7 @@ function classSelectSvg(): string {
   let stars = "";
   for (let i = 0; i < 170; i++) {
     const x = r1(rand() * W);
-    const y = r1(rand() * 420);
+    const y = r1(rand() * 400);
     const r = r1(0.4 + rand() * 1.3);
     const o = r1(0.25 + rand() * 0.7);
     stars += `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff6e0" opacity="${o}"/>`;
@@ -105,9 +105,9 @@ function classSelectSvg(): string {
 
   const castleColor = "#140e21";
   const roof = "#1c1330";
-  const cx = 480;
-  const base = 640;
-  // Drawn around a base line at y=640, then scaled/moved (below) into the
+  const cx = W / 2;
+  const base = 600;
+  // Drawn around a base line, then scaled/moved (below) into the
   // empty band under the class cards and buttons.
   const castle = `
     <g>
@@ -174,7 +174,7 @@ function classSelectSvg(): string {
     </radialGradient>
     <mask id="crescent">
       <rect width="${W}" height="${H}" fill="#fff"/>
-      <circle cx="818" cy="96" r="36" fill="#000"/>
+      <circle cx="1085" cy="88" r="36" fill="#000"/>
     </mask>
     <filter id="windowGlow" x="-200%" y="-200%" width="500%" height="500%">
       <feGaussianBlur stdDeviation="2.5" result="blur"/>
@@ -183,20 +183,20 @@ function classSelectSvg(): string {
   </defs>
   <rect width="${W}" height="${H}" fill="url(#sky)"/>
   ${stars}
-  <circle cx="800" cy="110" r="110" fill="url(#moonGlow)"/>
-  <circle cx="800" cy="110" r="38" fill="#f6ead0" mask="url(#crescent)"/>
-  <ellipse cx="480" cy="640" rx="520" ry="160" fill="url(#sunset)"/>
+  <circle cx="1067" cy="102" r="110" fill="url(#moonGlow)"/>
+  <circle cx="1067" cy="102" r="38" fill="#f6ead0" mask="url(#crescent)"/>
+  <ellipse cx="640" cy="600" rx="693" ry="150" fill="url(#sunset)"/>
   <g fill="#2a1a3a" opacity="0.55">
-    <ellipse cx="170" cy="250" rx="150" ry="10"/><ellipse cx="260" cy="268" rx="110" ry="7"/>
-    <ellipse cx="690" cy="300" rx="170" ry="9"/><ellipse cx="610" cy="318" rx="90" ry="6"/>
+    <ellipse cx="227" cy="250" rx="150" ry="10"/><ellipse cx="347" cy="268" rx="110" ry="7"/>
+    <ellipse cx="920" cy="300" rx="170" ry="9"/><ellipse cx="813" cy="318" rx="90" ry="6"/>
   </g>
-  ${ridge(rand, { baseY: 560, amp: 110, step: 48, color: "#3d2446", opacity: 0.95 })}
-  ${ridge(rand, { baseY: 610, amp: 70, step: 36, color: "#281733" })}
+  ${ridge(rand, { baseY: 530, amp: 110, step: 48, color: "#3d2446", opacity: 0.95 })}
+  ${ridge(rand, { baseY: 578, amp: 70, step: 36, color: "#281733" })}
   <!-- the castle's hill -->
-  <path d="M150 ${H} C290 722 400 708 480 708 C560 708 670 722 810 ${H} Z" fill="#170f23"/>
-  <g transform="translate(480 712) scale(0.72) translate(-480 -640)">${castle}</g>
-  <rect x="0" y="650" width="${W}" height="90" fill="url(#fog)"/>
-  ${ridge(rand, { baseY: 735, amp: 35, step: 30, color: "#0b0712" })}
+  <path d="M200 ${H} C387 683 533 669 640 669 C747 669 893 683 1080 ${H} Z" fill="#170f23"/>
+  <g transform="translate(640 672) scale(0.72) translate(-640 -600)">${castle}</g>
+  <rect x="0" y="610" width="${W}" height="90" fill="url(#fog)"/>
+  ${ridge(rand, { baseY: 695, amp: 35, step: 30, color: "#0b0712" })}
   ${trees}
   <rect width="${W}" height="260" fill="url(#topShade)"/>
   <rect width="${W}" height="${H}" fill="url(#vignette)"/>
@@ -212,8 +212,8 @@ export interface Torch {
 }
 
 export const TORCHES: Torch[] = [
-  { x: 118, y: 322 },
-  { x: 842, y: 322 },
+  { x: 278, y: 322 },
+  { x: 1002, y: 322 },
 ];
 
 function flame(x: number, y: number, s: number): string {
@@ -242,13 +242,13 @@ function battleSvg(): string {
   }
 
   // Flagstone floor in perspective, converging on the hall's far door.
-  const vx = 480;
+  const vx = W / 2;
   const vy = 420;
   let floorLines = "";
   for (let i = -12; i <= 12; i++) {
     floorLines += `<line x1="${vx}" y1="${vy}" x2="${vx + i * 110}" y2="${H}" />`;
   }
-  for (const y of [612, 632, 660, 697, 745]) {
+  for (const y of [604, 622, 644, 670, 700]) {
     floorLines += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" />`;
   }
 
@@ -298,7 +298,7 @@ function battleSvg(): string {
     </radialGradient>
     <clipPath id="floorArea">
       <rect x="0" y="600" width="${W}" height="${H - 600}"/>
-      <path d="M322 600 V362 A158 158 0 0 1 638 362 V600 Z"/>
+      <path d="M482 600 V362 A158 158 0 0 1 798 362 V600 Z"/>
     </clipPath>
     <radialGradient id="doorLight" cx="0.5" cy="0.8" r="0.7">
       <stop offset="0" stop-color="#6b5a8f" stop-opacity="0.55"/>
@@ -321,22 +321,22 @@ function battleSvg(): string {
   <rect width="${W}" height="${H}" fill="#120f17"/>
   ${bricks}
   <!-- great arched doorway at the back of the hall, behind the hand -->
-  <path d="M300 600 V360 A180 180 0 0 1 660 360 V600 Z" fill="#3a3442"/>
-  <path d="M322 600 V362 A158 158 0 0 1 638 362 V600 Z" fill="#0c0a12"/>
-  <path d="M322 600 V362 A158 158 0 0 1 638 362 V600 Z" fill="url(#doorLight)"/>
+  <path d="M460 600 V360 A180 180 0 0 1 820 360 V600 Z" fill="#3a3442"/>
+  <path d="M482 600 V362 A158 158 0 0 1 798 362 V600 Z" fill="#0c0a12"/>
+  <path d="M482 600 V362 A158 158 0 0 1 798 362 V600 Z" fill="url(#doorLight)"/>
   <g stroke="#2a2531" stroke-width="3" fill="none">
     ${Array.from({ length: 9 }, (_, i) => {
       const a = Math.PI + (i + 1) * (Math.PI / 10);
-      const x1 = 480 + Math.cos(a) * 158;
+      const x1 = 640 + Math.cos(a) * 158;
       const y1 = 362 + Math.sin(a) * 158;
-      const x2 = 480 + Math.cos(a) * 180;
+      const x2 = 640 + Math.cos(a) * 180;
       const y2 = 362 + Math.sin(a) * 180;
       return `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}"/>`;
     }).join("")}
   </g>
-  ${pillar(118)}${pillar(842)}
+  ${pillar(278)}${pillar(1002)}
   ${banner(40, "#7a1f24", swordEmblem(40))}
-  ${banner(920, "#1d2f5a", shieldEmblem(920))}
+  ${banner(1240, "#1d2f5a", shieldEmblem(1240))}
   ${TORCHES.map(torch).join("")}
   <!-- floor -->
   <rect x="0" y="600" width="${W}" height="${H - 600}" fill="url(#floor)"/>

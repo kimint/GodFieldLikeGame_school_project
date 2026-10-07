@@ -15,6 +15,13 @@ export default [
       sourceType: "module",
       globals: { ...globals.browser },
     },
+    rules: {
+      // Phaser ships a UMD global declaration that TypeScript resolves even
+      // without an import -- but Vite bundles it as ESM, so the global
+      // doesn't exist at runtime (blank screen, no error at build time).
+      // Force the explicit import instead.
+      "no-restricted-globals": ["error", { name: "Phaser", message: 'Import it instead: import Phaser from "phaser".' }],
+    },
   },
   {
     files: ["scripts/**/*.js", "*.config.js"],

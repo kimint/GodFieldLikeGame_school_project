@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactElement } from "react";
+import Phaser from "phaser";
 import { BattleScene } from "../scenes/BattleScene.ts";
 import { findClassById } from "../model/catalog.ts";
 import { createPhaserGame } from "./phaserGame.ts";
@@ -18,9 +19,11 @@ export function PhaserBattle({ playerClassId, onExit }: PhaserBattleProps): Reac
     const mount = mountRef.current;
     if (!mount) return;
     const playerClass = findClassById(playerClassId);
-    const game = createPhaserGame(mount, [BattleScene]);
+    // No scenes in the config: the battle scene is added (with its data) once
+    // the game is ready, so create() never runs without a playerClass.
+    const game = createPhaserGame(mount, []);
     game.events.once(Phaser.Core.Events.READY, () => {
-      game.scene.start("BattleScene", {
+      game.scene.add("BattleScene", BattleScene, true, {
         playerClass,
         onExit: () => onExitRef.current(),
       });

@@ -41,16 +41,16 @@ export const FONT_FAMILY = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 
 // --- Crisp rendering on high-DPI / scaled-up screens ----------------------
 //
-// Every scene lays itself out in a fixed 960x760 coordinate space. If the
-// canvas were also 960x760 pixels, Scale.FIT would stretch it up to fill the
+// Every scene lays itself out in a fixed 1280x720 coordinate space. If the
+// canvas were also 1280x720 pixels, Scale.FIT would stretch it up to fill the
 // window -- and on a Retina/HiDPI screen (devicePixelRatio 2+) that stretch
 // is what made text and icons look blurry. Instead the canvas is created
 // RENDER_SCALE times bigger and each scene's camera is zoomed by the same
-// factor (useRenderScale below), so all the layout code keeps using 960x760
+// factor (useRenderScale below), so all the layout code keeps using 1280x720
 // coordinates while the actual pixels match the screen.
 
-export const GAME_WIDTH = 960;
-export const GAME_HEIGHT = 760;
+export const GAME_WIDTH = 1280;
+export const GAME_HEIGHT = 720;
 
 function computeRenderScale(): number {
   const dpr = window.devicePixelRatio || 1;
@@ -63,7 +63,7 @@ function computeRenderScale(): number {
 export const RENDER_SCALE = computeRenderScale();
 
 // Call first thing in every scene's create(): zooms the camera so the
-// 960x760 layout fills the RENDER_SCALE-sized canvas, anchored top-left.
+// 1280x720 layout fills the RENDER_SCALE-sized canvas, anchored top-left.
 export function useRenderScale(scene: Phaser.Scene): void {
   scene.cameras.main.setOrigin(0, 0).setZoom(RENDER_SCALE);
 }

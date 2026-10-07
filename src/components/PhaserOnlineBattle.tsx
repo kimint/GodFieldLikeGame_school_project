@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactElement } from "react";
+import Phaser from "phaser";
 import { OnlineBattleScene } from "../scenes/OnlineBattleScene.ts";
 import type { Card } from "../model/cardTypes.ts";
 import type { MatchRow } from "../online/matchApi.ts";
@@ -21,9 +22,11 @@ export function PhaserOnlineBattle({ matchId, userId, match, hand, onExit }: Pha
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
-    const game = createPhaserGame(mount, [OnlineBattleScene]);
+    // No scenes in the config: the battle scene is added (with its data) once
+    // the game is ready, so create() never runs without match data.
+    const game = createPhaserGame(mount, []);
     game.events.once(Phaser.Core.Events.READY, () => {
-      game.scene.start("OnlineBattleScene", {
+      game.scene.add("OnlineBattleScene", OnlineBattleScene, true, {
         matchId,
         userId,
         match,

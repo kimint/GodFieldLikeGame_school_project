@@ -27,7 +27,7 @@ import {
 import { EFFECT_KIND, MODIFIER_MODE } from "../model/effects.ts";
 import { RESIST_STAT } from "../model/damageTypes.ts";
 import type { StatKey } from "../model/stats.ts";
-import type { DefendCard } from "../model/cardTypes.ts";
+import type { Card, DefendCard } from "../model/cardTypes.ts";
 import type { ClassDef } from "../model/classes.ts";
 import { allCards, allClasses } from "../model/catalog.ts";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY } from "../phaserIcons.ts";
@@ -38,6 +38,8 @@ import {
   TEXT,
   FONT_FAMILY,
   BACKGROUNDS,
+  GAME_WIDTH,
+  GAME_HEIGHT,
   addBackground,
   preloadBackground,
   roundedRect,
@@ -47,31 +49,78 @@ import {
   type Button,
 } from "./theme.ts";
 import { drawCardFace } from "./cardFace.ts";
-import { playRoundRecap, setRecapSpeed, type RecapPanel, type RecapSide, type RoundRecapRun } from "./roundRecap.ts";
+import { playRoundRecap, setRecapSpeed, type RecapPanel, type RecapSide, type RecapSlotView, type RoundRecapRun } from "./roundRecap.ts";
 
-const PANEL_Y = 44;
-const PANEL_W = 420;
-const PANEL_H = 200;
-const CPU_X = 40;
-const PLAYER_X = 500;
-const PANEL_PAD = 16;
-const BAR_W = PANEL_W - PANEL_PAD * 2;
+// 1280x720 board layout: CPU strip top-center, player strip lower-center,
+// portraits in the left column, battle log in the right column, hand along
+// the bottom-center, buttons mid-left. The 720px height budget means fighter
+// info lives in compact 124px strips (header + HP + chips + effects + meter)
+// instead of the old 200px panels -- same data and drawing helpers, tighter
+// rows. The middle arena band stays empty for the recap until Phase 3 slots.
+const STRIP_X = 240;
+const STRIP_W = 816;
+const STRIP_H = 124;
+const STRIP_PAD = 16;
+const CPU_STRIP_Y = 44;
+const PLAYER_STRIP_Y = 414;
+const STATUS_Y = 176;
 
-const HAND_Y = 296;
+// Left-column portraits: identity at a glance (icon + name + HP + ultimate).
+const PORTRAIT_X = 16;
+const PORTRAIT_W = 208;
+const PORTRAIT_H = 200;
+const CPU_PORTRAIT_Y = 44;
+const PLAYER_PORTRAIT_Y = 476;
+
+// Left-column buttons, between the portraits.
+const BUTTON_X = 24;
+const BUTTON_W = 176;
+const BUTTON_H = 40;
+const ULTIMATE_BUTTON_Y = 296;
+const LEAVE_BUTTON_Y = 346;
+
+const HAND_Y = 548;
 const CARD_W = 112;
 const CARD_H = 160;
-const CARD_GAP = 14;
 
-const BUTTON_ROW_Y = 466;
-const LOG_X = 30;
-const LOG_Y = 548;
-const LOG_W = 900;
-const LOG_H = 192;
-const LOG_LINE_HEIGHT = 20;
-const LOG_VISIBLE_LINES = Math.floor(LOG_H / LOG_LINE_HEIGHT);
+// Fanned bottom hand + preview-then-commit: cards overlap horizontally; hover
+// lifts slightly (mouse only); click/tap pops the card into a full preview
+// (raised, enlarged, gold ring) and a second click/tap commits it.
+const FAN_OVERLAP = 44;
+const HOVER_LIFT = 12;
+const POP_SCALE = 1.4;
+const POP_LIFT = 104;
+const PREVIEW_RING = 0xc49b3a;
 
-// The band the round recap covers: status line, hand and buttons.
-const RECAP_STAGE = { y: PANEL_Y + PANEL_H + 4, h: BUTTON_ROW_Y + 48 - (PANEL_Y + PANEL_H + 4) };
+// Middle arena slots holding each side's last resolved card (Phase 3). Fed
+// solely by post-resolution lastAction -- vacant pre-first-commit -- so the CPU slot
+// can never leak a face before reveal.
+const SLOT_W = 150;
+const SLOT_H = 190;
+const SLOT_Y = 195;
+const SLOT_GAP = 20;
+const SLOT_TOTAL_W = SLOT_W * 2 + SLOT_GAP;
+
+// Commit flight: hand card tosses into its slot before resolution (~260ms).
+const FLIGHT_DURATION = 260;
+
+export interface PendingPlay {
+  playerCard: Card | null; // committed card (null for ultimates: nothing to fly)
+  round: number; // battle.round at commit; validates the CPU face source
+  cpuRevealed: boolean; // flip done -- rebuilds may draw the face, not the back
+}
+
+const LOG_X = 1072;
+const LOG_Y = 44;
+const LOG_W = 192;
+const LOG_H = 628;
+// Wheel scroll step, px. Entries have variable (word-wrapped) heights, so
+// scrolling is a pixel offset, not a line index -- see renderLog.
+const LOG_SCROLL_STEP = 60;
+const LOG_ENTRY_GAP = 6;
+
+// The band the round recap covers: status line, arena, player strip and hand.
+const RECAP_STAGE = { y: STATUS_Y - 8, h: 400 };
 
 const STAT_CHIPS: Array<{ key: StatKey; label: string; color: number }> = [
   { key: "def", label: "DEF", color: 0xc9c9c9 },
@@ -91,10 +140,10 @@ const CHIP_COLOR = {
 const GUARD_COLOR = 0x6ec6ff;
 
 // Where the background's wall torches are painted -- keep in sync with
-// TORCHES in scripts/backgrounds.js.
+// TORCHES in scripts/backgrounds.ts.
 const TORCHES = [
-  { x: 118, y: 322 },
-  { x: 842, y: 322 },
+  { x: 278, y: 322 },
+  { x: 1002, y: 322 },
 ];
 const TORCH_GLOW_KEY = "torch-glow";
 
@@ -171,11 +220,31 @@ export class BattleScene extends Phaser.Scene {
   resultDismissed = false; // closed with "View board"
   cpuPanel!: Phaser.GameObjects.Container;
   playerPanel!: Phaser.GameObjects.Container;
+  cpuPortrait!: Phaser.GameObjects.Container;
+  playerPortrait!: Phaser.GameObjects.Container;
   statusText!: Phaser.GameObjects.Text;
   handContainer!: Phaser.GameObjects.Container;
+  slotsContainer!: Phaser.GameObjects.Container;
   ultimateButton!: Button;
-  logScrollIndex = 0;
-  logMaxScrollIndex = 0;
+  previewedCardId: number | null = null; // card id held in full preview (click/tap once; commits on second)
+  animatePreview = false; // tween the pop-in only on the selecting render, never on rebuilds
+  previewedView: Phaser.GameObjects.Container | null = null; // live popped container, for glide-back dismiss
+  previewedSlotX = 0; // its slot x, the dismiss target
+  dismissTween: Phaser.Tweens.Tween | null = null; // in-flight glide-back, killed on any rebuild
+  flightLayer!: Phaser.GameObjects.Container; // commit-flight clones; never rebuilt by render()
+  pendingPlay: PendingPlay | null = null; // committed round in flight: slots show it until the recap fades it
+  slotViews: Record<"player" | "cpu", { card: Phaser.GameObjects.Container | null; isBack: boolean }> = {
+    player: { card: null, isBack: false },
+    cpu: { card: null, isBack: false },
+  };
+  flightSeq = 0; // invalidates stale flight continuations (leave/restart mid-flight)
+  flightTween: Phaser.Tweens.Tween | null = null;
+  flightView: Phaser.GameObjects.Container | null = null;
+  flightPromise: Promise<void> | null = null;
+  flightResolve: (() => void) | null = null;
+  logScrollIndex = 0; // pixel offset into the measured log content
+  logMaxScrollIndex = 0; // max pixel offset (content height - box height)
+  logTotalHeight = 0; // measured content height, set by renderLog
   logContainer!: Phaser.GameObjects.Container;
   logScrollTrack!: Phaser.GameObjects.Rectangle;
   logScrollThumb!: Phaser.GameObjects.Rectangle;
@@ -256,12 +325,51 @@ export class BattleScene extends Phaser.Scene {
   }
 
   commitAction(action: Action): void {
+    this.previewedCardId = null;
+    this.animatePreview = false;
+    this.previewedView = null;
+    this.dismissTween?.stop();
+    this.dismissTween = null;
     const before = this.currentHp();
     playRound(this.battle, action);
     this.presentRound(before);
   }
 
+  // Glide a held preview back into the fan, then rebuild. Async on purpose:
+  // the snap-back was the complaint. Guarded everywhere a rebuild can beat
+  // it there -- renderHand kills the tween, commit paths clear the state --
+  // so a dead or stale target can never drive a render.
+  dismissPreview(): void {
+    const view = this.previewedView;
+    const slotX = this.previewedSlotX;
+    this.previewedCardId = null;
+    this.previewedView = null;
+    this.dismissTween?.stop();
+    this.dismissTween = null;
+    if (!view || !view.active || !view.scene) {
+      this.render();
+      return;
+    }
+    this.dismissTween = this.tweens.add({
+      targets: view,
+      x: slotX,
+      y: 0,
+      scale: 1,
+      duration: 120,
+      ease: "Sine.easeIn",
+      onComplete: () => {
+        this.dismissTween = null;
+        if (this.previewedCardId !== null || !this.sys.isActive()) return;
+        this.render();
+      },
+    });
+  }
+
   onLeave(): void {
+    // Abandon any commit flight: its continuation must not resolve a round
+    // for a battle being left.
+    this.flightSeq++;
+    this.finishFlight();
     // React shell supplies onExit so Back returns to the menu; fall back to
     // the in-Phaser menu when launched standalone (legacy/dev path).
     if (this.onExit) {
@@ -269,6 +377,83 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     this.scene.start("ClassSelectScene");
+  }
+
+  // Settle + clean up any commit flight without landing it. Resolves the
+  // flight promise so awaiters never hang; landing is skipped via the seq.
+  finishFlight(): void {
+    this.flightSeq++;
+    this.flightTween?.stop();
+    this.flightTween = null;
+    this.flightView?.destroy();
+    this.flightView = null;
+    this.flightResolve?.();
+    this.flightResolve = null;
+    this.flightPromise = null;
+  }
+
+  // Toss the committed card from the fan into its arena slot, then continue.
+  // Input stays locked (recapPlaying) from flight start through the recap,
+  // so the 250ms window can't double-commit. Blindness is preserved: the CPU
+  // still picks at resolve time, seeing nothing.
+  beginFlight(card: Card, onLanded: () => void): void {
+    this.finishFlight(); // supersede anything stale (defensive; normally idle)
+    const seq = ++this.flightSeq;
+    // The preview becomes the flight: clear pop state so the fan redraws
+    // whole (the card is still in hand until resolve removes it).
+    this.previewedCardId = null;
+    this.animatePreview = false;
+    this.previewedView = null;
+    this.dismissTween?.stop();
+    this.dismissTween = null;
+    this.pendingPlay = { playerCard: card, round: this.battle.round, cpuRevealed: false };
+    this.recapPlaying = true;
+    this.render();
+
+    const idx = this.battle.player.hand.findIndex((c) => c.id === card.id);
+    const step = CARD_W - FAN_OVERLAP;
+    const totalW = this.battle.player.hand.length * CARD_W - Math.max(0, this.battle.player.hand.length - 1) * FAN_OVERLAP;
+    const fx = GAME_WIDTH / 2 - totalW / 2 + Math.max(0, idx) * step;
+    const { container } = drawCardFace(
+      this,
+      {
+        cardId: card.cardId,
+        category: card.category,
+        name: card.name,
+        damageType: "damageType" in card ? card.damageType : null,
+        description: describeCard(card),
+      },
+      CARD_W,
+      CARD_H
+    );
+    container.setPosition(fx, HAND_Y);
+    this.flightLayer.add(container);
+    this.flightView = container;
+
+    const slotX = GAME_WIDTH / 2 + SLOT_TOTAL_W / 2 - SLOT_W + (SLOT_W - CARD_W) / 2;
+    const slotY = SLOT_Y + (SLOT_H - CARD_H) / 2;
+    let resolveFlight!: () => void;
+    this.flightPromise = new Promise<void>((resolve) => {
+      resolveFlight = resolve;
+    });
+    this.flightResolve = resolveFlight;
+    this.flightTween = this.tweens.add({
+      targets: container,
+      x: slotX,
+      y: slotY,
+      duration: FLIGHT_DURATION,
+      ease: "Cubic.easeOut",
+      onComplete: () => {
+        this.flightTween = null;
+        this.flightView = null;
+        container.destroy();
+        this.flightPromise = null;
+        this.flightResolve = null;
+        resolveFlight();
+        if (seq !== this.flightSeq || !this.sys.isActive()) return;
+        onLanded();
+      },
+    });
   }
 
   statusMessage(): string {
@@ -283,6 +468,22 @@ export class BattleScene extends Phaser.Scene {
     useRenderScale(this);
     this.onExit = data.onExit ?? null;
     this.recapPlaying = false;
+    this.previewedCardId = null;
+    this.animatePreview = false;
+    this.previewedView = null;
+    this.dismissTween = null;
+    this.pendingPlay = null;
+    this.flightSeq++; // abandon any flight continuation from a previous life
+    this.flightTween = null;
+    this.flightView = null;
+    this.flightPromise = null;
+    this.flightResolve = null;
+    this.slotViews = {
+      player: { card: null, isBack: false },
+      cpu: { card: null, isBack: false },
+    };
+    this.previewedView = null;
+    this.dismissTween = null;
     this.shownHp = null; // { player, cpu } while a recap is counting HP down
     this.panelViews = {};
     this.recapSpeed = readRecapSpeed();
@@ -295,6 +496,15 @@ export class BattleScene extends Phaser.Scene {
       this.time.timeScale = 1;
     });
 
+    // Bottom-most click catcher: any pointerdown that hits no interactive
+    // object (arena, strips, log, background) dismisses a held preview.
+    // Cards, buttons, and overlays all sit above it and win their own clicks
+    // (input.topOnly), so normal play is a single null-check no-op.
+    const dismissZone = this.add.zone(0, 0, GAME_WIDTH, GAME_HEIGHT).setOrigin(0, 0).setInteractive();
+    dismissZone.on("pointerdown", () => {
+      this.dismissPreview();
+    });
+
     addBackground(this, BACKGROUNDS.battle);
     this.addTorchLight();
 
@@ -305,12 +515,13 @@ export class BattleScene extends Phaser.Scene {
 
     textShadow(
       this.add
-        .text(480, 14, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "20px", fontStyle: "700", color: TEXT.white })
+        .text(GAME_WIDTH / 2, 14, "Godfield-lite", { fontFamily: FONT_FAMILY, fontSize: "20px", fontStyle: "700", color: TEXT.white })
         .setOrigin(0.5, 0)
     );
 
     const soundLabel = (): string => (isMuted() ? "Sound: off" : "Sound: on");
-    const soundButton = createButton(this, 960 - 40 - 110, 12, 110, 26, soundLabel(), {
+    // Top-left, clear of the centered title and the right-side log column.
+    const soundButton = createButton(this, 24, 12, 110, 26, soundLabel(), {
       color: COLORS.restart,
       hoverColor: COLORS.restartHover,
       onClick: () => {
@@ -322,7 +533,7 @@ export class BattleScene extends Phaser.Scene {
     // Speed of the end-of-round replay; takes effect immediately, even
     // mid-replay.
     const speedLabel = (): string => `Speed ${this.recapSpeed}x`;
-    const speedButton = createButton(this, 960 - 40 - 110 - 8 - 100, 12, 100, 26, speedLabel(), {
+    const speedButton = createButton(this, 24 + 110 + 8, 12, 100, 26, speedLabel(), {
       color: COLORS.restart,
       hoverColor: COLORS.restartHover,
       onClick: () => {
@@ -336,29 +547,27 @@ export class BattleScene extends Phaser.Scene {
 
     this.cpuPanel = this.add.container(0, 0);
     this.playerPanel = this.add.container(0, 0);
+    this.cpuPortrait = this.add.container(0, 0);
+    this.playerPortrait = this.add.container(0, 0);
 
     this.statusText = textShadow(
       this.add
-        .text(480, PANEL_Y + PANEL_H + 8, "", { fontFamily: FONT_FAMILY, fontSize: "14px", fontStyle: "700", color: TEXT.white, align: "center" })
-        .setOrigin(0.5, 0)
-    );
-
-    textShadow(
-      this.add
-        .text(480, HAND_Y - 20, "Your hand", { fontFamily: FONT_FAMILY, fontSize: "13px", fontStyle: "700", color: TEXT.body })
+        .text(GAME_WIDTH / 2, STATUS_Y, "", { fontFamily: FONT_FAMILY, fontSize: "14px", fontStyle: "700", color: TEXT.white, align: "center" })
         .setOrigin(0.5, 0)
     );
 
     this.handContainer = this.add.container(0, HAND_Y);
+    this.slotsContainer = this.add.container(0, 0);
+    this.flightLayer = this.add.container(0, 0);
 
-    const ultimate = createButton(this, 322, BUTTON_ROW_Y, 190, 40, "Use Ultimate", {
+    const ultimate = createButton(this, BUTTON_X, ULTIMATE_BUTTON_Y, BUTTON_W, BUTTON_H, "Use Ultimate", {
       color: COLORS.ultimate,
       hoverColor: COLORS.ultimateHover,
       onClick: () => this.onUltimateClick(),
     });
     this.ultimateButton = ultimate;
 
-    createButton(this, 528, BUTTON_ROW_Y, 110, 40, this.leaveLabel, {
+    createButton(this, BUTTON_X, LEAVE_BUTTON_Y, BUTTON_W, BUTTON_H, this.leaveLabel, {
       color: COLORS.restart,
       hoverColor: COLORS.restartHover,
       onClick: () => this.onLeave(),
@@ -389,7 +598,7 @@ export class BattleScene extends Phaser.Scene {
     // Only scroll the log when the pointer is over it, so it doesn't hijack
     // wheel input over the rest of the page.
     // pointer.x/y are canvas pixels, so convert them into the camera's
-    // (zoomed) 960x760 layout coordinates before comparing to the log's box.
+    // (zoomed) layout coordinates before comparing to the log's box.
     this.input.on("wheel", (pointer: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) => {
       void _objects;
       void _dx;
@@ -397,29 +606,30 @@ export class BattleScene extends Phaser.Scene {
       if (x < LOG_X || x > LOG_X + LOG_W || y < LOG_Y || y > LOG_Y + LOG_H) {
         return;
       }
-      this.scrollLog(Math.sign(dy));
+      this.scrollLog(Math.sign(dy) * LOG_SCROLL_STEP);
     });
 
     this.render();
     loadCardArt(this, allCards(), () => this.render());
   }
 
-  scrollLog(deltaLines: number): void {
-    const next = Phaser.Math.Clamp(this.logScrollIndex + deltaLines, 0, this.logMaxScrollIndex);
+  scrollLog(deltaPixels: number): void {
+    const next = Phaser.Math.Clamp(this.logScrollIndex + deltaPixels, 0, this.logMaxScrollIndex);
     if (next === this.logScrollIndex) return;
     this.logScrollIndex = next;
     this.renderLog();
   }
 
   updateLogScrollbar(): void {
-    const needsScroll = this.logMaxScrollIndex > 0;
+    const totalH = this.logTotalHeight;
+    const maxScroll = this.logMaxScrollIndex;
+    const needsScroll = maxScroll > 0;
     this.logScrollTrack.setVisible(needsScroll);
     this.logScrollThumb.setVisible(needsScroll);
     if (!needsScroll) return;
 
-    const totalLines = this.battle.log.length;
-    const thumbH = Math.max(24, (LOG_VISIBLE_LINES / totalLines) * LOG_H);
-    const thumbY = LOG_Y + (this.logScrollIndex / this.logMaxScrollIndex) * (LOG_H - thumbH);
+    const thumbH = Math.max(24, (LOG_H / totalH) * LOG_H);
+    const thumbY = LOG_Y + (this.logScrollIndex / maxScroll) * (LOG_H - thumbH);
     this.logScrollThumb.setSize(4, thumbH);
     this.logScrollThumb.setPosition(LOG_X + LOG_W - 6, thumbY);
   }
@@ -427,14 +637,18 @@ export class BattleScene extends Phaser.Scene {
   onCardClick(cardId: number): void {
     if (!this.canAct()) return;
     const action = cardAction(this.battle.player, cardId);
-    if (!action) return;
-    this.commitAction(action);
+    if (!action || action.kind !== "card") return;
+    // Preview state was already cleared by the committing click; fly first,
+    // resolve on landing. Ultimate clicks skip the flight (no hand card).
+    this.beginFlight(action.card, () => this.commitAction(action));
   }
 
   onUltimateClick(): void {
     if (!this.canAct()) return;
     const action = ultimateAction(this.battle.player);
     if (!action) return;
+    this.pendingPlay = { playerCard: null, round: this.battle.round, cpuRevealed: false };
+    this.render();
     this.commitAction(action);
   }
 
@@ -448,7 +662,7 @@ export class BattleScene extends Phaser.Scene {
   // `before`, play the recap (which counts HP down as hits land), then draw
   // the final state. Without both sides' lastAction (e.g. an online match on
   // a server that doesn't send it yet) it just redraws.
-  presentRound(before: HpPair): void {
+  async presentRound(before: HpPair): Promise<void> {
     const b = this.battle;
     const playerAction: LastAction | null = b.player.lastAction;
     const cpuAction: LastAction | null = b.cpu.lastAction;
@@ -461,6 +675,13 @@ export class BattleScene extends Phaser.Scene {
     this.shownHp = { ...before };
     this.render();
 
+    // The commit flight may still be landing (slow tween, fast resolve path):
+    // the recap must start from settled slot faces, never mid-flight.
+    await this.flightPromise;
+    if (!this.sys.isActive()) return;
+
+    const slotX = (key: "player" | "cpu"): number =>
+      key === "cpu" ? GAME_WIDTH / 2 - SLOT_TOTAL_W / 2 : GAME_WIDTH / 2 + SLOT_TOTAL_W / 2 - SLOT_W;
     const side = (key: "player" | "cpu", fighter: Fighter, who: string): RecapSide => ({
       action: key === "player" ? playerAction : cpuAction,
       who,
@@ -469,6 +690,14 @@ export class BattleScene extends Phaser.Scene {
       ultimateName: ultimateName(fighter.classDef),
       hp: before[key],
       panel: () => this.panelViews[key] as RecapPanel,
+      slot: (): RecapSlotView | null => {
+        const view = this.slotViews[key];
+        if (!view) return null;
+        return { x: slotX(key), y: SLOT_Y, w: SLOT_W, h: SLOT_H, card: view.card, isBack: view.isBack, faceW: CARD_W, faceH: CARD_H };
+      },
+      revealSlot: (): void => {
+        if (this.pendingPlay) this.pendingPlay.cpuRevealed = true;
+      },
     });
 
     playRoundRecap(this, {
@@ -482,6 +711,7 @@ export class BattleScene extends Phaser.Scene {
     }).finally(() => {
       this.recapPlaying = false;
       this.shownHp = null;
+      this.pendingPlay = null; // slots empty again until the next commit
       if (this.sys.isActive()) this.render();
     });
   }
@@ -496,12 +726,12 @@ export class BattleScene extends Phaser.Scene {
     if (this.resultLayer || this.resultDismissed) return;
     const b = this.battle;
     const result = b.draw ? RESULT.draw : b.winner === b.player ? RESULT.win : RESULT.lose;
-    const cx = 480;
-    const cy = 330;
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2 - 50;
 
     const layer = this.add.container(0, 0).setDepth(1000);
     this.resultLayer = layer;
-    const dim = this.add.rectangle(0, 0, 960, 760, 0x05070d, 0.75).setOrigin(0, 0).setInteractive();
+    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x05070d, 0.75).setOrigin(0, 0).setInteractive();
     layer.add(dim);
 
     if (result === RESULT.win) {
@@ -528,7 +758,7 @@ export class BattleScene extends Phaser.Scene {
       const confettiColors = [0xffd23f, 0xffffff, 0x6be39a, 0x6ec6ff, 0xff9d4d];
       for (let i = 0; i < 60; i++) {
         const piece = this.add
-          .rectangle(Phaser.Math.Between(0, 960), Phaser.Math.Between(-300, -10), 6, 10, (confettiColors[i % confettiColors.length] as number))
+          .rectangle(Phaser.Math.Between(0, GAME_WIDTH), Phaser.Math.Between(-300, -10), 6, 10, (confettiColors[i % confettiColors.length] as number))
           .setAngle(Phaser.Math.Between(0, 360));
         layer.add(piece);
         this.tweens.add({
@@ -543,7 +773,7 @@ export class BattleScene extends Phaser.Scene {
         });
       }
     } else if (result === RESULT.lose) {
-      const shade = this.add.rectangle(0, 0, 960, 760, 0x5a0f0f, 0).setOrigin(0, 0);
+      const shade = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x5a0f0f, 0).setOrigin(0, 0);
       layer.add(shade);
       this.tweens.add({ targets: shade, fillAlpha: 0.25, duration: 600 });
     }
@@ -631,8 +861,11 @@ export class BattleScene extends Phaser.Scene {
   render(): void {
     const locked = !this.canAct();
 
-    this.renderFighterPanel("cpu", this.cpuPanel, CPU_X, this.battle.cpu, this.opponentLabel);
-    this.renderFighterPanel("player", this.playerPanel, PLAYER_X, this.battle.player, this.playerLabel);
+    this.renderFighterPanel("cpu", this.cpuPanel, STRIP_X, CPU_STRIP_Y, STRIP_W, this.battle.cpu);
+    this.renderFighterPanel("player", this.playerPanel, STRIP_X, PLAYER_STRIP_Y, STRIP_W, this.battle.player);
+    this.drawPortrait(this.cpuPortrait, PORTRAIT_X, CPU_PORTRAIT_Y, this.battle.cpu, this.opponentLabel);
+    this.drawPortrait(this.playerPortrait, PORTRAIT_X, PLAYER_PORTRAIT_Y, this.battle.player, this.playerLabel);
+    this.drawSlots();
     this.renderHand(locked);
     this.renderLog();
 
@@ -646,36 +879,81 @@ export class BattleScene extends Phaser.Scene {
     key: "player" | "cpu",
     container: Phaser.GameObjects.Container,
     x: number,
+    y: number,
+    w: number,
+    fighter: Fighter
+  ): void {
+    container.removeAll(true);
+    container.setPosition(x, y);
+    container.add(roundedRect(this, w, STRIP_H, COLORS.panel, 12));
+
+    this.drawPanelHeader(container, fighter, w);
+    this.drawGuardFrame(container, fighter, w);
+    const setHp = this.drawHpBar(container, key, fighter, w);
+    this.drawStatChips(container, fighter, w);
+    // Bottom row is shared: effect chips on the left, ultimate meter right.
+    this.drawEffectChips(container, fighter, w, 92, w * 0.55);
+    this.drawUltimateMeter(container, fighter, w * 0.58, 97, w - w * 0.58 - STRIP_PAD);
+
+    this.panelViews[key] = { x, y, w, h: STRIP_H, container, setHp };
+  }
+
+  // Left-column identity block: big class icon, name, side label, HP and
+  // ultimate status. The strip beside it carries bars and chips.
+  drawPortrait(
+    container: Phaser.GameObjects.Container,
+    x: number,
+    y: number,
     fighter: Fighter,
     label: string
   ): void {
     container.removeAll(true);
-    container.setPosition(x, PANEL_Y);
-    container.add(roundedRect(this, PANEL_W, PANEL_H, COLORS.panel, 12));
+    container.setPosition(x, y);
+    container.add(roundedRect(this, PORTRAIT_W, PORTRAIT_H, COLORS.panel, 12));
 
-    this.drawPanelHeader(container, fighter, label);
-    this.drawGuardFrame(container, fighter);
-    const setHp = this.drawHpBar(container, key, fighter);
-    this.drawStatChips(container, fighter);
-    this.drawEffectChips(container, fighter);
-    this.drawUltimateMeter(container, fighter);
-
-    this.panelViews[key] = { x, y: PANEL_Y, w: PANEL_W, h: PANEL_H, container, setHp };
-  }
-
-  drawPanelHeader(container: Phaser.GameObjects.Container, fighter: Fighter, label: string): void {
-    container.add(this.add.circle(34, 32, 20, COLORS.meterTrack));
+    const cx = PORTRAIT_W / 2;
+    container.add(this.add.circle(cx, 52, 34, COLORS.meterTrack));
     const iconKey = classIconKey(fighter.classDef.id);
     if (this.textures.exists(iconKey)) {
-      container.add(this.add.image(34, 32, iconKey).setDisplaySize(26, 26));
+      container.add(this.add.image(cx, 52, iconKey).setDisplaySize(48, 48));
     }
     container.add(
-      this.add.text(64, 13, label.toUpperCase(), { fontFamily: FONT_FAMILY, fontSize: "11px", fontStyle: "700", color: TEXT.muted })
+      this.add.text(cx, 94, label.toUpperCase(), { fontFamily: FONT_FAMILY, fontSize: "11px", fontStyle: "700", color: TEXT.muted }).setOrigin(0.5, 0)
     );
     container.add(
-      this.add.text(64, 28, shortName(fighter.classDef.name), {
+      this.add.text(cx, 112, shortName(fighter.classDef.name), {
         fontFamily: FONT_FAMILY,
-        fontSize: "17px",
+        fontSize: "15px",
+        fontStyle: "700",
+        color: TEXT.white,
+        align: "center",
+        wordWrap: { width: PORTRAIT_W - 24 },
+      }).setOrigin(0.5, 0)
+    );
+    container.add(
+      this.add.text(cx, 152, `${Math.ceil(fighter.hp)} / ${fighter.maxHp} HP`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: "16px",
+        fontStyle: "800",
+        color: TEXT.white,
+      }).setOrigin(0.5, 0)
+    );
+    const ready = canUseUltimate(fighter);
+    container.add(
+      this.add.text(cx, 176, ready ? "ULT READY" : `ULT ${fmt(fighter.ultimateMeter)}/${fighter.classDef.ultimate.cost}`, {
+        fontFamily: FONT_FAMILY,
+        fontSize: "12px",
+        fontStyle: "800",
+        color: ready ? "#ffd23f" : TEXT.muted,
+      }).setOrigin(0.5, 0)
+    );
+  }
+
+  drawPanelHeader(container: Phaser.GameObjects.Container, fighter: Fighter, w: number): void {
+    container.add(
+      this.add.text(STRIP_PAD, 6, shortName(fighter.classDef.name), {
+        fontFamily: FONT_FAMILY,
+        fontSize: "14px",
         fontStyle: "700",
         color: TEXT.white,
       })
@@ -683,20 +961,20 @@ export class BattleScene extends Phaser.Scene {
     const handCount = fighter.handCount ?? fighter.hand.length;
     container.add(
       this.add
-        .text(PANEL_W - PANEL_PAD, 16, `Hand ${handCount}`, { fontFamily: FONT_FAMILY, fontSize: "11px", color: TEXT.muted })
+        .text(w - STRIP_PAD, 8, `Hand ${handCount}`, { fontFamily: FONT_FAMILY, fontSize: "11px", color: TEXT.muted })
         .setOrigin(1, 0)
     );
   }
 
-  // While a defend card is up: a pulsing blue frame around the panel and a
+  // While a defend card is up: a pulsing blue frame around the strip and a
   // "GUARD +5" badge in the header, so it's obvious at a glance.
-  drawGuardFrame(container: Phaser.GameObjects.Container, fighter: Fighter): void {
+  drawGuardFrame(container: Phaser.GameObjects.Container, fighter: Fighter, w: number): void {
     const guards = Object.values(fighter.activeDefends);
     if (guards.length === 0) return;
 
     const frame = this.add.graphics();
     frame.lineStyle(3, GUARD_COLOR, 1);
-    frame.strokeRoundedRect(1.5, 1.5, PANEL_W - 3, PANEL_H - 3, 12);
+    frame.strokeRoundedRect(1.5, 1.5, w - 3, STRIP_H - 3, 12);
     container.add(frame);
     this.tweens.add({ targets: frame, alpha: 0.35, duration: 800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
     frame.once("destroy", () => this.tweens.killTweensOf(frame));
@@ -710,13 +988,13 @@ export class BattleScene extends Phaser.Scene {
       })
       .setOrigin(0, 0.5);
     const iconSize = 14;
-    const w = text.width + iconSize + 22;
+    const wBadge = text.width + iconSize + 22;
     const h = 22;
-    const x = PANEL_W - PANEL_PAD - 58 - w; // left of "Hand N"
-    const y = 11;
+    const x = w - STRIP_PAD - 58 - wBadge; // left of "Hand N"
+    const y = 4;
     const pill = this.add.graphics();
     pill.fillStyle(GUARD_COLOR, 1);
-    pill.fillRoundedRect(x, y, w, h, h / 2);
+    pill.fillRoundedRect(x, y, wBadge, h, h / 2);
     container.add(pill);
     if (this.textures.exists(CARD_ICON_KEY.defend)) {
       container.add(this.add.image(x + 8 + iconSize / 2, y + h / 2, CARD_ICON_KEY.defend).setDisplaySize(iconSize, iconSize).setTint(0x0b1b26));
@@ -728,21 +1006,28 @@ export class BattleScene extends Phaser.Scene {
   // Big HP bar. Returns setHp(value), which animates the bar to a new value
   // (with a pale "ghost" of the lost HP that drains a moment later) -- the
   // round recap calls it as each hit lands.
-  drawHpBar(container: Phaser.GameObjects.Container, key: "player" | "cpu", fighter: Fighter): (next: number) => void {
-    const y = 60;
-    const h = 24;
+  drawHpBar(
+    container: Phaser.GameObjects.Container,
+    key: "player" | "cpu",
+    fighter: Fighter,
+    w: number
+  ): (next: number) => void {
+    const pad = STRIP_PAD;
+    const barW = w - pad * 2;
+    const y = 28;
+    const h = 20;
     const track = this.add.graphics();
     track.fillStyle(COLORS.meterTrack, 1);
-    track.fillRoundedRect(PANEL_PAD, y, BAR_W, h, 7);
+    track.fillRoundedRect(pad, y, barW, h, 7);
     const ghost = this.add.graphics();
     const fill = this.add.graphics();
     const hpLabel = this.add
-      .text(PANEL_PAD + 10, y + h / 2, "HP", { fontFamily: FONT_FAMILY, fontSize: "11px", fontStyle: "800", color: TEXT.white })
+      .text(pad + 10, y + h / 2, "HP", { fontFamily: FONT_FAMILY, fontSize: "11px", fontStyle: "800", color: TEXT.white })
       .setOrigin(0, 0.5);
     const value = this.add
-      .text(PANEL_PAD + BAR_W / 2, y + h / 2, "", {
+      .text(pad + barW / 2, y + h / 2, "", {
         fontFamily: FONT_FAMILY,
-        fontSize: "14px",
+        fontSize: "13px",
         fontStyle: "800",
         color: TEXT.white,
         stroke: "#000000",
@@ -753,10 +1038,10 @@ export class BattleScene extends Phaser.Scene {
 
     const bar = (g: Phaser.GameObjects.Graphics, hp: number, color: number, alpha: number): void => {
       g.clear();
-      const w = BAR_W * Phaser.Math.Clamp(hp / fighter.maxHp, 0, 1);
-      if (w <= 0) return;
+      const bw = barW * Phaser.Math.Clamp(hp / fighter.maxHp, 0, 1);
+      if (bw <= 0) return;
       g.fillStyle(color, alpha);
-      g.fillRoundedRect(PANEL_PAD, y, w, h, Math.min(7, w / 2));
+      g.fillRoundedRect(pad, y, bw, h, Math.min(7, bw / 2));
     };
     const draw = (hp: number, ghostHp: number): void => {
       bar(ghost, ghostHp, 0xffffff, 0.35);
@@ -781,11 +1066,13 @@ export class BattleScene extends Phaser.Scene {
 
   // DEF / MR / ER / UR, each with its change from the class's base value
   // (synergies, buffs and debuffs) as a green/red arrow.
-  drawStatChips(container: Phaser.GameObjects.Container, fighter: Fighter): void {
-    const y = 96;
-    const h = 44;
+  drawStatChips(container: Phaser.GameObjects.Container, fighter: Fighter, w: number): void {
+    const pad = STRIP_PAD;
+    const barW = w - pad * 2;
+    const y = 54;
+    const h = 32;
     const gap = 8;
-    const w = (BAR_W - gap * (STAT_CHIPS.length - 1)) / STAT_CHIPS.length;
+    const cw = (barW - gap * (STAT_CHIPS.length - 1)) / STAT_CHIPS.length;
     const stats = computeCurrentStats(fighter);
     const base = fighter.classDef.baseStats;
 
@@ -797,27 +1084,27 @@ export class BattleScene extends Phaser.Scene {
     }
 
     STAT_CHIPS.forEach((chip, i) => {
-      const x = PANEL_PAD + i * (w + gap);
+      const x = pad + i * (cw + gap);
       const delta = stats[chip.key] - (base[chip.key] ?? 0);
       const guard = guardByStat[chip.key];
       const g = this.add.graphics();
       g.fillStyle(guard ? 0x16384d : COLORS.meterTrack, 1);
-      g.fillRoundedRect(x, y, w, h, 7);
+      g.fillRoundedRect(x, y, cw, h, 7);
       g.fillStyle(chip.color, 1);
       g.fillRoundedRect(x, y, 4, h, { tl: 7, bl: 7, tr: 0, br: 0 });
       const outline = guard ? GUARD_COLOR : delta > 0 ? 0x6be39a : delta < 0 ? 0xff6b5f : null;
       if (outline !== null) {
         g.lineStyle(2, outline, 1);
-        g.strokeRoundedRect(x + 1, y + 1, w - 2, h - 2, 7);
+        g.strokeRoundedRect(x + 1, y + 1, cw - 2, h - 2, 7);
       }
       container.add(g);
 
       if (guard) {
         container.add(
           this.add
-            .text(x + w - 7, y + 5, `🛡${guardAmount(guard)}`, {
+            .text(x + cw - 7, y + 4, `🛡${guardAmount(guard)}`, {
               fontFamily: FONT_FAMILY,
-              fontSize: "11px",
+              fontSize: "10px",
               fontStyle: "800",
               color: "#8fd3ff",
             })
@@ -826,12 +1113,12 @@ export class BattleScene extends Phaser.Scene {
       }
 
       container.add(
-        this.add.text(x + 12, y + 5, chip.label, { fontFamily: FONT_FAMILY, fontSize: "10px", fontStyle: "700", color: TEXT.muted })
+        this.add.text(x + 10, y + 3, chip.label, { fontFamily: FONT_FAMILY, fontSize: "9px", fontStyle: "700", color: TEXT.muted })
       );
       container.add(
-        this.add.text(x + 12, y + 18, fmt(stats[chip.key]), {
+        this.add.text(x + 10, y + 13, fmt(stats[chip.key]), {
           fontFamily: FONT_FAMILY,
-          fontSize: "19px",
+          fontSize: "16px",
           fontStyle: "800",
           color: delta > 0 ? "#6be39a" : delta < 0 ? "#ff6b5f" : TEXT.white,
         })
@@ -840,9 +1127,9 @@ export class BattleScene extends Phaser.Scene {
       if (delta !== 0) {
         container.add(
           this.add
-            .text(x + w - 8, y + h - 8, `${delta > 0 ? "▲" : "▼"}${fmt(Math.abs(delta))}`, {
+            .text(x + cw - 6, y + h - 5, `${delta > 0 ? "▲" : "▼"}${fmt(Math.abs(delta))}`, {
               fontFamily: FONT_FAMILY,
-              fontSize: "12px",
+              fontSize: "11px",
               fontStyle: "700",
               color: delta > 0 ? "#6be39a" : "#ff6b5f",
             })
@@ -854,7 +1141,8 @@ export class BattleScene extends Phaser.Scene {
 
   // One row of chips: synergy progress, active defends, temporary
   // buffs/debuffs and disabled synergies, each with turns remaining.
-  drawEffectChips(container: Phaser.GameObjects.Container, fighter: Fighter): void {
+  // Shares the strip's bottom row with the ultimate meter (see maxX).
+  drawEffectChips(container: Phaser.GameObjects.Container, fighter: Fighter, w: number, y: number, maxX: number): void {
     const chips: Array<{ text: string; color: number }> = [];
 
     for (const synergy of fighter.classDef.synergyPool) {
@@ -889,15 +1177,13 @@ export class BattleScene extends Phaser.Scene {
       chips.push({ text: `${describeEffect(effect)} · ${remaining}t`, color: positive ? CHIP_COLOR.up : CHIP_COLOR.down });
     }
 
-    const y = 148;
-    const h = 20;
-    let x = PANEL_PAD;
-    const maxX = PANEL_W - PANEL_PAD;
+    const h = 18;
+    let x = STRIP_PAD;
     for (let i = 0; i < chips.length; i++) {
       const chip = chips[i];
       if (!chip) break;
       const text = this.add
-        .text(0, y + h / 2, chip.text, { fontFamily: FONT_FAMILY, fontSize: "11px", fontStyle: "600", color: TEXT.white })
+        .text(0, y + h / 2, chip.text, { fontFamily: FONT_FAMILY, fontSize: "10px", fontStyle: "600", color: TEXT.white })
         .setOrigin(0, 0.5);
       const w = text.width + 14;
       const moreW = 34;
@@ -919,30 +1205,29 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  drawUltimateMeter(container: Phaser.GameObjects.Container, fighter: Fighter): void {
-    const y = 180;
+  drawUltimateMeter(container: Phaser.GameObjects.Container, fighter: Fighter, x0: number, y: number, w: number): void {
     const cost = fighter.classDef.ultimate.cost;
     const ready = canUseUltimate(fighter);
-    let barX = PANEL_PAD;
+    let barX = x0;
     if (this.textures.exists(ULTIMATE_ICON_KEY)) {
-      container.add(this.add.image(PANEL_PAD + 7, y, ULTIMATE_ICON_KEY).setDisplaySize(16, 16));
-      barX = PANEL_PAD + 22;
+      container.add(this.add.image(x0 + 7, y, ULTIMATE_ICON_KEY).setDisplaySize(16, 16));
+      barX = x0 + 22;
     }
-    const barW = PANEL_W - PANEL_PAD - barX - 64;
+    const barW = w - (barX - x0) - 64;
     const g = this.add.graphics();
     g.fillStyle(COLORS.meterTrack, 1);
     g.fillRoundedRect(barX, y - 5, barW, 10, 5);
-    const w = barW * Math.min(1, fighter.ultimateMeter / cost);
-    if (w > 0) {
+    const bw = barW * Math.min(1, fighter.ultimateMeter / cost);
+    if (bw > 0) {
       g.fillStyle(ready ? COLORS.ultimateHover : COLORS.meterFill, 1);
-      g.fillRoundedRect(barX, y - 5, w, 10, Math.min(5, w / 2));
+      g.fillRoundedRect(barX, y - 5, bw, 10, Math.min(5, bw / 2));
     }
     container.add(g);
 
     const label = this.add
-      .text(PANEL_PAD, y, ready ? "READY!" : `${fmt(fighter.ultimateMeter)}/${cost}`, {
+      .text(x0 + w - 8, y, ready ? "READY!" : `${fmt(fighter.ultimateMeter)}/${cost}`, {
         fontFamily: FONT_FAMILY,
-        fontSize: ready ? "13px" : "12px",
+        fontSize: ready ? "12px" : "11px",
         fontStyle: "800",
         color: ready ? "#ffd23f" : TEXT.muted,
       })
@@ -955,58 +1240,228 @@ export class BattleScene extends Phaser.Scene {
   }
 
   renderHand(locked: boolean): void {
+    // A rebuild invalidates any glide-back target: kill it first so a dead
+    // container can never drive (or double-fire) a render.
+    this.dismissTween?.stop();
+    this.dismissTween = null;
     this.handContainer.removeAll(true);
     const cards = this.battle.player.hand;
-    const totalW = cards.length * CARD_W + Math.max(0, cards.length - 1) * CARD_GAP;
-    let x = 480 - totalW / 2;
+    const step = CARD_W - FAN_OVERLAP;
+    const totalW = cards.length * CARD_W - Math.max(0, cards.length - 1) * FAN_OVERLAP;
+    const x0 = GAME_WIDTH / 2 - totalW / 2;
 
-    for (const card of cards) {
-      const { container: cardContainer, bg } = drawCardFace(
-        this,
-        {
-          cardId: card.cardId,
-          category: card.category,
-          name: card.name,
-          damageType: "damageType" in card ? card.damageType : null,
-          description: describeCard(card),
-        },
-        CARD_W,
-        CARD_H
-      );
-      cardContainer.setPosition(x, 0);
+    // Previewed card renders last so it floats above the fan.
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i] as Card;
+      if (card.id === this.previewedCardId) continue;
+      this.drawHandCard(card, x0 + i * step, false, locked);
+    }
+    const pi = cards.findIndex((c) => c.id === this.previewedCardId);
+    if (pi !== -1) this.drawHandCard(cards[pi] as Card, x0 + pi * step, true, locked);
+  }
 
-      if (!locked) {
-        bg.on("pointerover", () => this.tweens.add({ targets: cardContainer, y: -8, duration: 100 }));
-        bg.on("pointerout", () => this.tweens.add({ targets: cardContainer, y: 0, duration: 100 }));
-        bg.on("pointerdown", () => this.onCardClick(card.id));
+  drawHandCard(card: Card, x: number, previewed: boolean, locked: boolean): void {
+    const { container: cardContainer, bg } = drawCardFace(
+      this,
+      {
+        cardId: card.cardId,
+        category: card.category,
+        name: card.name,
+        damageType: "damageType" in card ? card.damageType : null,
+        description: describeCard(card),
+      },
+      CARD_W,
+      CARD_H
+    );
+    if (previewed) {
+      const ring = this.add.graphics();
+      ring.lineStyle(3, PREVIEW_RING, 1);
+      ring.strokeRoundedRect(-6, -6, CARD_W + 12, CARD_H + 12, 14);
+      cardContainer.add(ring);
+      const popX = x - (CARD_W * (POP_SCALE - 1)) / 2;
+      this.previewedView = cardContainer;
+      this.previewedSlotX = x;
+      if (this.animatePreview) {
+        // Spring into place from the slot (selection moment only); every
+        // other rebuild lands instantly so the pop never replays.
+        this.animatePreview = false;
+        cardContainer.setPosition(x, 0).setScale(1);
+        this.tweens.add({
+          targets: cardContainer,
+          x: popX,
+          y: -POP_LIFT,
+          scale: POP_SCALE,
+          duration: 140,
+          ease: "Back.easeOut",
+        });
       } else {
-        cardContainer.setAlpha(0.5);
-        bg.disableInteractive();
+        cardContainer.setPosition(popX, -POP_LIFT).setScale(POP_SCALE);
       }
+    } else {
+      cardContainer.setPosition(x, 0);
+    }
 
-      this.handContainer.add(cardContainer);
-      x += CARD_W + CARD_GAP;
+    if (!locked) {
+      bg.on("pointerover", (pointer: Phaser.Input.Pointer) => {
+        if (pointer.wasTouch || this.previewedCardId === card.id) return;
+        this.tweens.killTweensOf(cardContainer);
+        this.tweens.add({ targets: cardContainer, y: -HOVER_LIFT, duration: 100 });
+      });
+      bg.on("pointerout", () => {
+        if (this.previewedCardId === card.id) return; // keep the pop
+        this.tweens.killTweensOf(cardContainer);
+        this.tweens.add({ targets: cardContainer, y: 0, duration: 100 });
+      });
+      bg.on("pointerdown", () => {
+        if (this.previewedCardId === card.id) {
+          this.onCardClick(card.id); // second click commits
+          return;
+        }
+        this.previewedCardId = card.id;
+        this.animatePreview = true;
+        this.render();
+      });
+    } else {
+      cardContainer.setAlpha(0.5);
+      bg.disableInteractive();
+    }
+
+    this.handContainer.add(cardContainer);
+  }
+
+  // Middle arena slots holding each side's last resolved card. Fed solely by
+  // post-resolution lastAction -- vacant pre-first-commit -- so the CPU slot
+  // can never leak a face before reveal.
+  // Face-down back for the CPU slot: the pending round exists, but the move
+  // must stay hidden until the recap's flip reveal.
+  drawCardBack(): Phaser.GameObjects.Container {
+    const container = this.add.container(0, 0);
+    const g = this.add.graphics();
+    g.fillStyle(0x1b1f2c, 1);
+    g.fillRoundedRect(0, 0, CARD_W, CARD_H, 10);
+    g.lineStyle(3, 0xc49b3a, 1);
+    g.strokeRoundedRect(0, 0, CARD_W, CARD_H, 10);
+    const q = this.add
+      .text(CARD_W / 2, CARD_H / 2, "?", {
+        fontFamily: FONT_FAMILY,
+        fontSize: "40px",
+        fontStyle: "800",
+        color: "#c49b3a",
+      })
+      .setOrigin(0.5);
+    container.add([g, q]);
+    return container;
+  }
+
+  // Arena slots show the in-flight round only: the committed player face (or
+  // nothing pre-landing... the flight clone covers the gap), the CPU back
+  // until the recap flips it, and vacant frames otherwise. lastAction faces
+  // are NOT drawn here -- the recap performs from these live objects instead
+  // of minting duplicates, then they fade and the slots empty again.
+  drawSlots(): void {
+    this.slotsContainer.removeAll(true);
+    const pending = this.pendingPlay;
+    const sides: Array<{ key: "player" | "cpu"; fighter: Fighter; x: number }> = [
+      { key: "cpu", fighter: this.battle.cpu, x: GAME_WIDTH / 2 - SLOT_TOTAL_W / 2 },
+      { key: "player", fighter: this.battle.player, x: GAME_WIDTH / 2 + SLOT_TOTAL_W / 2 - SLOT_W },
+    ];
+    for (const { key, fighter, x } of sides) {
+      const frame = this.add.graphics();
+      frame.lineStyle(2, 0x4a5573, 1);
+      frame.strokeRoundedRect(x, SLOT_Y, SLOT_W, SLOT_H, 10);
+      this.slotsContainer.add(frame);
+      const fx = x + (SLOT_W - CARD_W) / 2;
+      const fy = SLOT_Y + (SLOT_H - CARD_H) / 2;
+
+      let card: Phaser.GameObjects.Container | null = null;
+      let isBack = false;
+      if (key === "player" && pending?.playerCard) {
+        const played = pending.playerCard;
+        const { container } = drawCardFace(
+          this,
+          {
+            cardId: played.cardId,
+            category: played.category,
+            name: played.name,
+            damageType: "damageType" in played ? played.damageType : null,
+            description: describeCard(played),
+          },
+          CARD_W,
+          CARD_H
+        );
+        container.setPosition(fx, fy);
+        this.slotsContainer.add(container);
+        card = container;
+      } else if (key === "cpu" && pending) {
+        const last = fighter.lastAction;
+        if (last && last.round === pending.round && pending.cpuRevealed && last.kind !== "none") {
+          const face =
+            last.kind === "ultimate"
+              ? {
+                  category: "ultimate",
+                  name: ultimateName(fighter.classDef),
+                  description: `${fmt(last.damage ?? 0)} damage`,
+                }
+              : { ...last, category: last.category ?? "" };
+          const { container } = drawCardFace(this, face, CARD_W, CARD_H);
+          container.setPosition(fx, fy);
+          this.slotsContainer.add(container);
+          card = container;
+        } else {
+          const back = this.drawCardBack();
+          back.setPosition(fx, fy);
+          this.slotsContainer.add(back);
+          card = back;
+          isBack = true;
+        }
+      } else {
+        const hint = this.add
+          .text(x + SLOT_W / 2, SLOT_Y + SLOT_H / 2, "—", {
+            fontFamily: FONT_FAMILY,
+            fontSize: "12px",
+            color: TEXT.muted,
+          })
+          .setOrigin(0.5);
+        this.slotsContainer.add(hint);
+      }
+      this.slotViews[key] = { card, isBack };
     }
   }
 
   renderLog(): void {
     this.logContainer.removeAll(true);
 
-    this.logMaxScrollIndex = Math.max(0, this.battle.log.length - LOG_VISIBLE_LINES);
+    // Measure every entry offscreen first: at 192px wide each line wraps to
+    // a different height, so entries advance by measured height, never a
+    // fixed step (which piled wrapped lines onto each other).
+    const style = {
+      fontFamily: FONT_FAMILY,
+      fontSize: "12px",
+      color: TEXT.body,
+      wordWrap: { width: LOG_W - 20 },
+    };
+    const heights: number[] = [];
+    let totalH = 0;
+    for (const line of this.battle.log) {
+      const probe = this.add.text(0, 0, line, style);
+      const h = probe.height;
+      probe.destroy();
+      heights.push(h);
+      totalH += h + LOG_ENTRY_GAP;
+    }
+    if (heights.length > 0) totalH -= LOG_ENTRY_GAP;
+    this.logTotalHeight = totalH;
+
+    this.logMaxScrollIndex = Math.max(0, totalH - LOG_H);
     this.logScrollIndex = Phaser.Math.Clamp(this.logScrollIndex, 0, this.logMaxScrollIndex);
 
-    const visible = this.battle.log.slice(this.logScrollIndex, this.logScrollIndex + LOG_VISIBLE_LINES);
-    let y = 0;
-    for (const line of visible) {
-      this.logContainer.add(
-        this.add.text(0, y, line, {
-          fontFamily: FONT_FAMILY,
-          fontSize: "12px",
-          color: TEXT.body,
-          wordWrap: { width: LOG_W - 20 },
-        })
-      );
-      y += LOG_LINE_HEIGHT;
+    let y = -this.logScrollIndex;
+    for (let i = 0; i < this.battle.log.length; i++) {
+      const h = heights[i] as number;
+      if (y + h >= 0 && y <= LOG_H) {
+        this.logContainer.add(this.add.text(0, y, this.battle.log[i] as string, style));
+      }
+      y += h + LOG_ENTRY_GAP;
     }
 
     this.updateLogScrollbar();

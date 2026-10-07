@@ -18,13 +18,12 @@ import { CARD_ICON_KEY } from "../phaserIcons.ts";
 import { playSfx } from "../fx/sound.ts";
 import { MODIFIER_MODE } from "../model/effects.ts";
 import type { LastAction } from "../model/engine.ts";
-import { COLORS, TEXT, FONT_FAMILY } from "./theme.ts";
+import { COLORS, TEXT, FONT_FAMILY, GAME_WIDTH } from "./theme.ts";
 import { drawCardFace, type CardFaceData } from "./cardFace.ts";
 import { burstParticles, fmt, hex, projectile, tween, wait, type PanelRect, type RecapRun } from "./recapUtil.ts";
 import { playUltimate } from "./ultimateFx.ts";
 
-const CARD_W = 124;
-const CARD_H = 176;
+const CARD_W = 124; // caption offset + revealed-face fallback size
 const SKIP_SPEED = 6;
 
 const EFFECT_COLOR = {
@@ -48,6 +47,21 @@ export interface RecapSide {
   ultimateName: string;
   hp: number; // HP shown before this round (counted down as hits land)
   panel: () => RecapPanel;
+  slot: () => RecapSlotView | null; // live arena slot card (face or back), if any
+  revealSlot?: () => void; // mark the CPU slot revealed (for rebuild consistency)
+}
+
+// A live arena slot card handed to the recap: the round performs from this
+// object instead of the recap minting a duplicate face.
+export interface RecapSlotView {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  card: Phaser.GameObjects.Container | null;
+  isBack: boolean;
+  faceW: number; // slot face footprint (backs and reveals match it exactly)
+  faceH: number;
 }
 
 export interface RoundRecap {
@@ -73,7 +87,7 @@ export async function playRoundRecap(scene: RecapCapableScene, recap: RoundRecap
   applySpeed(scene, recap.speed ?? 1);
 
   const { y: stageY, h: stageH } = recap.stage;
-  const overlay = scene.add.rectangle(0, stageY, 960, stageH, COLORS.background, 0.86).setOrigin(0, 0);
+  const overlay = scene.add.rectangle(0, stageY, GAME_WIDTH, stageH, COLORS.background, 0.86).setOrigin(0, 0);
   overlay.setInteractive();
   overlay.on("pointerdown", () => skip(run));
   const hint = scene.add
@@ -124,7 +138,7 @@ async function roundBanner(run: RoundRecapRun): Promise<void> {
   const { scene, recap, layer } = run;
   const cy = recap.stage.y + recap.stage.h / 2;
   const text = scene.add
-    .text(480, cy, `Round ${recap.round}`, {
+    .text(GAME_WIDTH / 2, cy, `Round ${recap.round}`, {
       fontFamily: FONT_FAMILY,
       fontSize: "40px",
       fontStyle: "800",
@@ -142,6 +156,13 @@ async function roundBanner(run: RoundRecapRun): Promise<void> {
   text.destroy();
 }
 
+// Face data matching a resolved action, for (re)drawing a slot face.
+function faceForAction(side: RecapSide, action: LastAction): CardFaceData {
+  return action.kind === "ultimate"
+    ? { category: "ultimate", name: side.ultimateName, description: `${fmt(action.damage ?? 0)} damage` }
+    : { ...action, category: action.category ?? "" };
+}
+
 // --- one fighter's action ----------------------------------------------------
 
 async function playStep(run: RoundRecapRun, key: "player" | "cpu"): Promise<void> {
@@ -149,13 +170,14 @@ async function playStep(run: RoundRecapRun, key: "player" | "cpu"): Promise<void
   const side = recap.sides[key];
   const target = recap.sides[key === "player" ? "cpu" : "player"];
   const action = side.action;
-  const panel = side.panel();
+  const slot = side.slot();
+  const scx = slot ? slot.x + slot.w / 2 : GAME_WIDTH / 2;
+  const scy = slot ? slot.y + slot.h / 2 : recap.stage.y + recap.stage.h / 2;
   const cy = recap.stage.y + recap.stage.h / 2 + 4;
-  const cardX = panel.x + panel.w / 2;
-  const leftSide = cardX < 480;
+  const leftSide = scx < GAME_WIDTH / 2;
 
-  // Caption beside the card, toward the middle of the screen.
-  const captionX = leftSide ? cardX + CARD_W / 2 + 24 : cardX - CARD_W / 2 - 24;
+  // Caption beside the slot, toward the middle of the screen.
+  const captionX = leftSide ? scx + CARD_W / 2 + 24 : scx - CARD_W / 2 - 24;
   const caption = scene.add.container(captionX, cy - 44).setAlpha(0);
   const align = leftSide ? 0 : 1;
   const whoText = scene.add
@@ -171,26 +193,33 @@ async function playStep(run: RoundRecapRun, key: "player" | "cpu"): Promise<void
   caption.add([whoText, titleText, resultText]);
   layer.add(caption);
 
-  // The card itself, growing out of the actor's panel.
-  let holder: Phaser.GameObjects.Container | null = null;
-  if (action.kind !== "none") {
-    const face: CardFaceData =
-      action.kind === "ultimate"
-        ? { category: "ultimate", name: side.ultimateName, description: `${fmt(action.damage ?? 0)} damage` }
-        : { ...action, category: action.category ?? "" };
-    const { container } = drawCardFace(scene, face, CARD_W, CARD_H);
-    container.setPosition(-CARD_W / 2, -CARD_H / 2);
-    holder = scene.add.container(cardX, panel.y + panel.h / 2, [container]).setScale(0.25).setAlpha(0);
-    layer.add(holder);
+  // The round performs from its arena slot: the live slot card rises for
+  // its moment (revealing first if it's still face-down), the effect runs
+  // from the slot, then the face fades and the slot empties. No duplicate
+  // faces are ever drawn -- compare the old panel fly-out this replaced.
+  let face = slot?.card ?? null;
+  if (action.kind !== "none" && face && slot?.isBack) {
+    // Crossfade reveal: back out, face in, same footprint.
+    await tween(run, { targets: face, alpha: 0, duration: 100 });
+    face.destroy();
+    const revealed = drawCardFace(scene, faceForAction(side, action), slot.faceW, slot.faceH);
+    revealed.container.setPosition(
+      slot.x + (slot.w - slot.faceW) / 2,
+      slot.y + (slot.h - slot.faceH) / 2
+    ).setAlpha(0);
+    layer.add(revealed.container);
+    face = revealed.container;
+    side.revealSlot?.();
+    await tween(run, { targets: face, alpha: 1, duration: 150 });
+  }
+  if (action.kind !== "none" && face) {
+    await tween(run, { targets: face, y: "-=14", duration: 140, yoyo: true, ease: "Sine.easeOut" });
     playSfx("card");
   }
 
-  await Promise.all([
-    holder && tween(run, { targets: holder, x: cardX, y: cy, scale: 1, alpha: 1, duration: 320, ease: "Back.easeOut" }),
-    tween(run, { targets: caption, alpha: 1, duration: 250 }),
-  ]);
+  await tween(run, { targets: caption, alpha: 1, duration: 250 });
 
-  const result = await playEffect(run, side, target, action, holder ?? { x: cardX, y: cy });
+  const result = await playEffect(run, side, target, action, { x: scx, y: scy });
   if (result) {
     resultText.setText(result.text).setColor(hex(result.color));
     resultText.setScale(1.3);
@@ -198,8 +227,11 @@ async function playStep(run: RoundRecapRun, key: "player" | "cpu"): Promise<void
   }
 
   await wait(run, 700);
-  await tween(run, { targets: [holder, caption].filter(Boolean), alpha: 0, duration: 200 });
-  holder?.destroy(true);
+  await tween(run, { targets: [face, caption].filter(Boolean), alpha: 0, duration: 200 });
+  // Faded, not destroyed-on-sight: the final render rebuilds vacant slots
+  // anyway. (A mid-recap rebuild redraws from pendingPlay -- same accepted
+  // staleness class as panelViews.)
+  face?.destroy(true);
   caption.destroy(true);
 }
 

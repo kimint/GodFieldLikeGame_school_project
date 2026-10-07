@@ -15,7 +15,7 @@
 import Phaser from "phaser";
 import { classIconKey, ULTIMATE_ICON_KEY } from "../phaserIcons.ts";
 import { playSfx } from "../fx/sound.ts";
-import { FONT_FAMILY, TEXT } from "./theme.ts";
+import { FONT_FAMILY, TEXT, GAME_WIDTH, GAME_HEIGHT } from "./theme.ts";
 import { burstParticles, panelCenter, projectile, scaled, tween, wait, type PanelRect, type RecapRun } from "./recapUtil.ts";
 import type { RecapSide } from "./roundRecap.ts";
 
@@ -54,18 +54,21 @@ export async function playUltimate(
 
 async function cutIn(run: RecapRun, side: RecapSide, theme: UltimateTheme): Promise<void> {
   const { scene, layer } = run;
-  const cy = 380;
+  const cy = GAME_HEIGHT / 2;
+  const cx = GAME_WIDTH / 2;
   const band = scene.add.container(0, 0);
   layer.add(band);
 
-  const bg = scene.add.rectangle(480, cy, 960, 170, theme.dark, 0.96).setScale(1, 0);
-  const edgeTop = scene.add.rectangle(480, cy - 85, 960, 4, theme.color).setScale(0, 1);
-  const edgeBottom = scene.add.rectangle(480, cy + 85, 960, 4, theme.color).setScale(0, 1);
+  const bg = scene.add.rectangle(cx, cy, GAME_WIDTH, 170, theme.dark, 0.96).setScale(1, 0);
+  const edgeTop = scene.add.rectangle(cx, cy - 85, GAME_WIDTH, 4, theme.color).setScale(0, 1);
+  const edgeBottom = scene.add.rectangle(cx, cy + 85, GAME_WIDTH, 4, theme.color).setScale(0, 1);
   band.add([bg, edgeTop, edgeBottom]);
 
   // Coming from the actor's side of the screen: emblem on that side,
   // text toward the middle, both sliding in from the actor's edge.
-  const fromRight = panelCenter(side.panel()).x > 480;
+  // Positions are fractions of the stage width so the composition holds at
+  // any aspect (tuned at 960 wide: 260/700 icon, 370/590 text).
+  const fromRight = panelCenter(side.panel()).x > GAME_WIDTH / 2;
   const dir = fromRight ? -1 : 1;
 
   const lines: Phaser.GameObjects.Rectangle[] = [];
@@ -75,8 +78,8 @@ async function cutIn(run: RecapRun, side: RecapSide, theme: UltimateTheme): Prom
       .setAlpha(0);
     band.add(line);
     lines.push(line);
-    const startX = fromRight ? -150 : 1110;
-    const endX = fromRight ? 1110 : -150;
+    const startX = fromRight ? -GAME_WIDTH * 0.156 : GAME_WIDTH * 1.156;
+    const endX = fromRight ? GAME_WIDTH * 1.156 : -GAME_WIDTH * 0.156;
     line.x = startX + (endX - startX) * Math.random();
     scene.tweens.add({ targets: line, alpha: 1, duration: 120 });
     scene.tweens.add({
@@ -88,18 +91,18 @@ async function cutIn(run: RecapRun, side: RecapSide, theme: UltimateTheme): Prom
     });
   }
 
-  const iconX = fromRight ? 700 : 260;
+  const iconX = fromRight ? GAME_WIDTH * 0.729 : GAME_WIDTH * 0.271;
   const glow = scene.add.circle(iconX, cy, 72, theme.color, 0.3).setBlendMode(Phaser.BlendModes.ADD).setScale(0);
   band.add(glow);
   const iconKey = scene.textures.exists(classIconKey(side.classId)) ? classIconKey(side.classId) : ULTIMATE_ICON_KEY;
   const icon = scene.textures.exists(iconKey)
-    ? scene.add.image(iconX - dir * 400, cy, iconKey).setDisplaySize(124, 124)
+    ? scene.add.image(iconX - dir * GAME_WIDTH * 0.417, cy, iconKey).setDisplaySize(124, 124)
     : null;
   if (icon) band.add(icon);
 
-  const textX = fromRight ? 590 : 370;
+  const textX = fromRight ? GAME_WIDTH * 0.615 : GAME_WIDTH * 0.385;
   const align = fromRight ? 1 : 0;
-  const texts = scene.add.container(textX - dir * 500, cy);
+  const texts = scene.add.container(textX - dir * GAME_WIDTH * 0.521, cy);
   texts.add([
     scene.add
       .text(0, -48, `${side.who.toUpperCase()} · ULTIMATE`, {
@@ -215,7 +218,7 @@ async function pyromancerUltimate(run: RecapRun, from: { x: number; y: number },
   const c = panelCenter(panel);
 
   // Heat haze over the whole screen.
-  const heat = scene.add.rectangle(0, 0, 960, 760, 0xff4d1a, 0).setOrigin(0, 0);
+  const heat = scene.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0xff4d1a, 0).setOrigin(0, 0);
   layer.add(heat);
   scene.tweens.add({ targets: heat, fillAlpha: 0.16, duration: 250 });
 
