@@ -15,8 +15,8 @@ export const COLORS: {
   meterTrack: number;
   meterFill: number;
 } = {
-  background: 0x1e2230,
-  panel: 0x2a2f42,
+  background: 0x1f2023,
+  panel: 0x2e3033,
   card: {
     attack: 0xb5423a,
     defend: 0x2f6f8f,
@@ -26,15 +26,15 @@ export const COLORS: {
   },
   ultimate: 0xa8842f,
   ultimateHover: 0xc49b3a,
-  restart: 0x4a5573,
-  restartHover: 0x586694,
-  meterTrack: 0x1b1f2c,
+  restart: 0x484b51,
+  restartHover: 0x5a5e65,
+  meterTrack: 0x1a1b1e,
   meterFill: 0xa8842f,
 };
 
 export const TEXT: { body: string; muted: string; white: string } = {
-  body: "#e8eaf0",
-  muted: "#a9adc1",
+  body: "#e9eaec",
+  muted: "#a9abb0",
   white: "#ffffff",
 };
 
