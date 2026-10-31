@@ -83,6 +83,40 @@ Vite serves it as-is.
 Card names/numbers are first-pass values for wiring the system together, not tuned game
 balance — see the open questions in `docs/DESIGN.md`.
 
+## Tutorial
+
+New players learn by playing: the tutorial is a guided practice match (a Pyromancer against a
+weak **Training Dummy**) rather than a page of rules. A coach panel in the battle log's column
+says what to do next and highlights where to click; clicks that don't fit the current step are
+refused (the panel flashes), and **Skip tutorial** leaves at any point. Over five rounds it
+covers:
+
+1. The board, playing a card (click it, click it again), AP and End turn.
+2. Resistances (DEF / MR / ER), a defend card blocking an attack made the same round, and
+   playing several cards in one turn.
+3. Summoning a monster.
+4. Aiming an attack at an enemy monster, giving your monster an order, Burning, and guards.
+5. Statuses, your class's synergy, and finishing the dummy with your ultimate.
+
+How to get there:
+
+- **New accounts** are asked once, on their first login, whether to start the tutorial or skip
+  it. Either answer sets `tutorial_seen: true` in the account's Supabase user metadata
+  (`markTutorialSeen()` in `src/online/authApi.ts`), so it isn't asked again on any device.
+  Sign-up stores `tutorial_seen: false`; accounts made before the tutorial existed don't have
+  the field and aren't asked.
+- **Anyone** can open it from the **Tutorial** button on the home screen (it works with online
+  features off, too).
+
+The match is scripted, in `src/scenes/TutorialBattleScene.ts` (a `BattleScene` subclass): each
+round deals fixed hands to both sides and plays the dummy's turn from the script, and the cards
+come from the bundled catalog (`catalogData.ts`) so the AP math and damage don't drift if the
+live catalog's numbers change. The dummy has 30 HP and low resistances and never uses its
+ultimate; the priority dice are seeded; there's no turn timer. Each round's steps are either
+"info" (wait for **Next**) or done when the turn being planned satisfies them, so taking a card
+back steps the coach back too. If the dummy survives the script, the match carries on as a normal
+vs-CPU game.
+
 ## Architecture
 
 `src/model/*` is the entire game engine (classes, cards, synergies, the round loop, TypeScript) and knows
@@ -291,16 +325,18 @@ includes in the public match state — so online matches need the `game` functio
 | --- | --- |
 | `index.html` | The game — a `#root` div; React owns the shell, Phaser owns the battle canvas inside it |
 | `src/main.tsx` | React-shell bootstrap (catalog load, then `<App />`) |
-| `src/app/App.tsx` | Screen state machine: menu / battle / lobby / online-battle / gallery |
+| `src/app/App.tsx` | Screen state machine: menu / battle / lobby / online-battle / gallery / record / tutorial; the new-account tutorial prompt |
 | `src/components/ClassSelect.tsx` | Class-select screen (was `ClassSelectScene`) |
 | `src/components/Gallery.tsx` | Card gallery (was `CardGalleryScene`) |
 | `src/components/Lobby.tsx` | Online: create/join a room, wait for the opponent (was `LobbyScene`) |
 | `src/components/Dialog.tsx` | Join-code / confirm popups (React; the canvas-era `src/ui/dialog.ts` still serves `RandomBattleScene`'s leave confirm) |
 | `src/components/PhaserBattle.tsx` | vs-CPU battle mount: creates a scoped `Phaser.Game`, starts `BattleScene`, destroys on unmount |
+| `src/components/PhaserTutorial.tsx` | Tutorial mount — same, for `TutorialBattleScene` |
 | `src/components/PhaserRandomBattle.tsx` | Online battle mount (random match and private rooms) — same, for `RandomBattleScene` |
 | `src/components/phaserGame.ts` | Shared `createPhaserGame()` helper (HiDPI text patch, FIT scaling) |
 | `src/hooks/useCatalog.ts` | Catalog load with Supabase → local fallback (was inline in old `main.js`) |
 | `src/scenes/BattleScene.ts` | Battle stage: renders the model's battle state, turns clicks into `playRound()` calls; `onExit` returns to the React menu |
+| `src/scenes/TutorialBattleScene.ts` | The guided tutorial match: scripted rounds, coach panel and highlights (see "Tutorial" above) |
 | `src/scenes/RandomBattleScene.ts` | Online battle stage — `BattleScene`'s drawing, fed by the Colyseus server (`server/BattleRoom.ts`) instead of a local engine |
 | `src/online/matchApi.ts` | Supabase client for online PvP (see "Online PvP" above) |
 | `supabase/` | Supabase config, database migrations, and the `game` Edge Function |
@@ -341,7 +377,7 @@ includes in the public match state — so online matches need the `game` functio
 
 ## Known simplifications (see docs/DESIGN.md for the full list)
 
-- Every match (vs-CPU, random, private room) has a 30-second turn timer; online matches hold a
+- Every match (vs-CPU, random, private room) has a 30-second turn timer (the tutorial has none); online matches hold a
   dropped player's seat for 30 seconds. Both online modes run on the Colyseus server
   (`server/BattleRoom.ts`); a private room is a private Colyseus room whose id is the room code.
   The older `game` Edge Function is no longer used by the browser.
