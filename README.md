@@ -47,7 +47,8 @@ Vite serves it as-is.
    and AP refills each turn (unspent AP is lost). Play as many cards as your AP pays for: click a
    card to see it big in the middle of the screen, click it again to put it on your arena slot
    (click one there to take it back), add your ultimate if it's charged, then press
-   **End turn** (with nothing picked, that's a pass).
+   **End turn** (with nothing picked, that's a pass). You have **30 seconds** per turn; when
+   time runs out, your turn ends with whatever you had planned (or a pass if it can't be paid for).
    - Attacks and ultimates go in **priority** order (fast cards first; where the two sides tie,
      each side's die roll for the round decides). A fighter knocked out mid-way gets none of
      their remaining strikes, and a landed "interrupts" card cancels the opponent's next attack
@@ -132,8 +133,9 @@ double-effect would boot and destroy a whole `Phaser.Game` on every battle mount
 
 ## Online PvP (Supabase)
 
-Log in (or sign up), pick a class and a deck, then **Create online room** (you get a 5-letter
-code to send a friend) or **Join with code**. The login is kept per browser tab, so two tabs on
+Log in (or sign up), pick a class and a deck, then **Random match**, **Create online room** (you
+get a 5-letter code to send a friend) or **Join with code**. Both online modes run on the
+Colyseus server in `server/` (see "Turn timer, reconnection and rematch" below). The login is kept per browser tab, so two tabs on
 one machine can log in to two different accounts and play each other for testing.
 
 ### Accounts and decks
@@ -168,6 +170,40 @@ The same `src/model/` engine runs on the server instead of in the browser:
   updates (plus a slow poll as a fallback).
 - `.env` — the project URL and *publishable* key. Both are public by design and committed.
   Never put the secret / service_role key there.
+
+### Turn timer, reconnection and rematch
+
+Random matches and private rooms both use one Colyseus room, `server/BattleRoom.ts`, so these
+rules are the same in both modes. A private room is a private Colyseus room whose id is the
+5-letter code (`onCreate({ private: true })` + `setPrivate`), so random matchmaking never joins it.
+
+| Feature | vs-CPU | Online (random / private) |
+| --- | --- | --- |
+| Turn timer | 30s, browser clock, starts after the round recap | 30s, server clock (`TURN_SECONDS`) + 2s grace for the browser's auto-send |
+| Reconnection | — (the game runs in the browser) | Seat held 30s (`RECONNECT_SECONDS`); a reloaded tab rejoins with the token in `sessionStorage` |
+| Rematch | — | 30s window after the battle (`REMATCH_SECONDS`) |
+
+- **Turn timer.** When time runs out the turn ends with the staged cards, or a pass if they can't
+  be paid for any more. `BattleScene.onTurnTick()` runs the countdown for vs-CPU;
+  `RandomBattleScene` overrides it to follow `turnMsLeft` from the server. It uses
+  `window.setInterval`, not Phaser's clock, because the recap speed setting scales Phaser's clock.
+- **Reconnection.** A dropped player sees "Connection lost. Reconnecting…" while the SDK retries;
+  the opponent sees a countdown. Not back in 30s = forfeit.
+- **Rematch.** After an online battle the result screen shows **Rematch** and **Leave (30s)**.
+  When one player presses Rematch, the other sees "Your opponent wants a rematch!". Both press it →
+  a new battle with the same classes and decks (the room's `game` counter goes up and the scene
+  restarts). If the opponent leaves or drops → "Your opponent left. Returning to the lobby in 5s…".
+  If 30s pass → everyone returns to the menu (after "Your opponent didn't accept the rematch." if
+  you had asked). Each game is recorded separately in `match_history`. A mid-battle forfeit
+  closes the room with no rematch.
+- **Messages.** Browser → server: `pick` (the turn), `rematch`. Server → browser: `state`
+  (`RandomMatchView` in `src/online/randomMatchView.ts`, with `turnMsLeft`,
+  `opponentReconnectMsLeft`, `game`, `rematchMsLeft`, `myRematch`, `opponentRematch`) and
+  `rematchEnded` (`"timeout"` | `"opponentLeft"`).
+- **Running it locally.** `npm run dev:all` starts the server on `:2567`, but `.env.sandbox`
+  points the browser at the Railway server; put `VITE_COLYSEUS_URL=ws://localhost:2567` in
+  `.env.sandbox.local` to use the local one. The server needs `SUPABASE_URL` and the matching
+  project's secret key in `.env.server.local` (gitignored).
 
 ### Game catalog (classes, synergies, cards)
 
