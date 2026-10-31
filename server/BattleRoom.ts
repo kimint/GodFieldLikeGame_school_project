@@ -1,7 +1,12 @@
-// Random-match PvP room. Colyseus fills each "battle" room with 2 players
-// (joinOrCreate), so the matchmaking itself is built in. The game rules are
-// the same src/model/* files the browser and the `game` Edge Function use.
-import { Room, type Client, type Delayed } from "@colyseus/core";
+// Online PvP room, for both kinds of online match:
+// - random match: Colyseus fills each public "battle" room with 2 players
+//   (joinOrCreate), so the matchmaking itself is built in;
+// - private room: created with { private: true }, it gets a short room code
+//   as its id and stays out of random matchmaking; a friend joins by code
+//   (joinById).
+// Both get the same turn timer and 30s reconnection. The game rules are the
+// same src/model/* files the browser uses.
+import { Room, matchMaker, type Client, type Delayed } from "@colyseus/core";
 import { createBattle, fromClientAction, passAction, resolveRound, isBattleOver } from "../src/model/engine.ts";
 import type { Action, Battle, ClientAction, Fighter } from "../src/model/engine.ts";
 import { findClassById } from "../src/model/catalog.ts";
@@ -12,6 +17,7 @@ import type { RandomMatchView } from "../src/online/randomMatchView.ts";
 import { admin } from "./supabase.ts";
 
 interface JoinOptions {
+  private?: boolean; // only read when the room is created
   token?: string;
   classId?: string;
   deckId?: string | null;
@@ -25,6 +31,15 @@ interface Seat {
   deckList: DeckListEntry[] | null;
   pick: Action | null;
   reconnectBy: number | null; // while dropped: when the seat is given up (ms)
+}
+
+// No ambiguous characters (0/O, 1/I) so a code read out loud still works.
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CODE_LENGTH = 5;
+
+function randomCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(CODE_LENGTH));
+  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
 }
 
 const RECONNECT_SECONDS = 30;
@@ -87,7 +102,14 @@ export class BattleRoom extends Room {
     this.sendViews();
   }
 
-  onCreate() {
+  async onCreate(options: JoinOptions) {
+    if (options.private) {
+      // The room code is the room id, so joinById(code) finds it.
+      let code = randomCode();
+      for (let i = 0; i < 5 && (await matchMaker.query({ roomId: code })).length > 0; i++) code = randomCode();
+      this.roomId = code;
+      await this.setPrivate(true); // never handed out by joinOrCreate
+    }
     this.onMessage("pick", (client, action: ClientAction) => {
       const seat = this.seatOf(client);
       if (!this.battle || !seat || seat.pick) return;
@@ -162,7 +184,12 @@ export class BattleRoom extends Room {
   onLeave(client: Client) {
     const seat = this.seatOf(client);
     if (seat) seat.reconnectBy = null;
-    if (!this.battle || isBattleOver(this.battle)) return;
+    // Left before an opponent arrived: free the seat for the next player.
+    if (!this.battle) {
+      this.seats = this.seats.filter((s) => s !== seat);
+      return;
+    }
+    if (isBattleOver(this.battle)) return;
     this.stopTurnTimer();
     const other = this.otherSeat(seat);
     if (other) {

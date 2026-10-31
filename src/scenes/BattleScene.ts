@@ -21,6 +21,7 @@ import {
   orderCost,
   targetProblem,
   describeAbility,
+  passAction,
   playRound,
   describeEffect,
   isBattleOver,
@@ -354,7 +355,10 @@ export interface HpPair {
   cpu: number;
 }
 
-// vs-CPU battle. OnlineBattleScene (src/scenes/OnlineBattleScene.ts) reuses
+// Seconds per turn: the same as online play (server/BattleRoom.ts TURN_SECONDS).
+export const TURN_SECONDS = 30;
+
+// vs-CPU battle. RandomBattleScene (src/scenes/RandomBattleScene.ts) reuses
 // all of the drawing below and only overrides the hooks in the "battle
 // source" section: where the battle comes from, what a click does, and the
 // status line.
@@ -403,6 +407,10 @@ export class BattleScene extends Phaser.Scene {
   logHidden = false;
   logScrollTrack!: Phaser.GameObjects.Rectangle;
   logScrollThumb!: Phaser.GameObjects.Rectangle;
+  // Turn timer. vs-CPU runs its own clock; online scenes copy the server's.
+  turnDeadline: number | null = null; // local-clock ms when this turn's time runs out
+  turnTimerRound = 0; // the round the vs-CPU clock was started for
+  autoEnded = false; // already ended this round's turn because time ran out
 
   constructor(key = "BattleScene") {
     super(key);
@@ -445,7 +453,7 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // --- battle source (overridden by OnlineBattleScene) ---------------------
+  // --- battle source (overridden by RandomBattleScene) ---------------------
 
   setupBattle(data: BattleSceneData): Battle {
     const playerClass = data.playerClass;
@@ -484,7 +492,7 @@ export class BattleScene extends Phaser.Scene {
     return !isBattleOver(this.battle) && !this.recapPlaying;
   }
 
-  // Send this turn. vs-CPU resolves it right away; OnlineBattleScene
+  // Send this turn. vs-CPU resolves it right away; RandomBattleScene
   // overrides this to send it to the server.
   commitAction(action: Action): void {
     this.clearPlanning();
@@ -534,8 +542,44 @@ export class BattleScene extends Phaser.Scene {
   statusMessage(): string {
     if (this.battle.winner) return `${fighterName(this.battle.winner)} wins! ${this.leaveHint}`;
     if (this.battle.draw) return `Draw! ${this.leaveHint}`;
-    if (this.handHint) return `Round ${this.battle.round} — ${this.handHint}`;
-    return `Round ${this.battle.round} — ${this.plannedAp()}/${this.battle.player.maxAp} AP left. Play cards or click your monsters to give orders, then End turn.`;
+    const turnLeft = this.canAct() ? this.secondsLeft(this.turnDeadline) : null;
+    if (this.handHint) return `Round ${this.battle.round} — ${this.handHint}${turnLeft === null ? "" : ` (${turnLeft}s)`}`;
+    return `Round ${this.battle.round} — ${turnLeft === null ? "" : `${turnLeft}s · `}${this.plannedAp()}/${this.battle.player.maxAp} AP left. Play cards or click your monsters to give orders, then End turn.`;
+  }
+
+  // --- turn timer ----------------------------------------------------------
+
+  // Whole seconds left until a local-clock deadline, or null.
+  secondsLeft(deadline: number | null): number | null {
+    return deadline === null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  }
+
+  // Runs 4x a second. vs-CPU: start the clock once the player can act (after
+  // the recap), end the turn when it runs out, refresh the countdown.
+  // Online scenes override this to follow the server's clock instead.
+  onTurnTick(): void {
+    if (!this.statusText?.active || isBattleOver(this.battle)) return;
+    if (this.canAct() && this.turnTimerRound !== this.battle.round) {
+      this.turnTimerRound = this.battle.round;
+      this.turnDeadline = Date.now() + TURN_SECONDS * 1000;
+      this.autoEnded = false;
+    }
+    if (this.autoEndTurnIfTimeUp()) return;
+    this.statusText.setText(this.statusMessage());
+  }
+
+  // Time's up: end the turn with whatever was planned, if it can still be
+  // paid for; otherwise pass. Returns whether it did.
+  autoEndTurnIfTimeUp(): boolean {
+    if (this.turnDeadline === null || Date.now() < this.turnDeadline || this.autoEnded || !this.canAct()) return false;
+    this.autoEnded = true;
+    this.handHint = null;
+    this.previewedCardId = null;
+    this.targeting = null;
+    this.monsterMenuUid = null;
+    this.onEndTurnClick();
+    if (this.canAct()) this.commitAction(passAction()); // plan couldn't be paid for
+    return true;
   }
 
   // --- scene ---------------------------------------------------------------
@@ -551,9 +595,16 @@ export class BattleScene extends Phaser.Scene {
     this.recapSpeed = readRecapSpeed();
     this.resultLayer = null; // the end-of-game screen, once shown
     this.resultDismissed = false; // closed with "View board"
+    this.turnDeadline = null;
+    this.turnTimerRound = 0;
+    this.autoEnded = false;
     this.battle = this.setupBattle(data);
 
+    // Turn-timer tick. A plain interval, not this.time: the recap speed
+    // setting scales Phaser's clock.
+    const tick = window.setInterval(() => this.onTurnTick(), 250);
     this.events.once("shutdown", () => {
+      window.clearInterval(tick);
       this.tweens.timeScale = 1;
       this.time.timeScale = 1;
     });

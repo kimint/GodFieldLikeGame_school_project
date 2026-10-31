@@ -1,9 +1,9 @@
-// Random-match battle screen. Draws exactly like the vs-CPU BattleScene; the
+// Online battle screen (random match and private rooms). Draws exactly like the vs-CPU BattleScene; the
 // battle comes from the Colyseus server (src/online/randomMatch.ts), which
 // resolves the round once both players have picked.
 
 import { BattleScene, type BattleSceneData } from "./BattleScene.ts";
-import { isBattleOver, passAction, type Action } from "../model/engine.ts";
+import { isBattleOver, type Action } from "../model/engine.ts";
 import { deserializeFighter } from "../model/serialize.ts";
 import type { BattleView } from "../online/matchApi.ts";
 import type { RandomMatch, RandomMatchView } from "../online/randomMatch.ts";
@@ -36,7 +36,6 @@ export class RandomBattleScene extends BattleScene {
   pendingPick: string | null = null;
   errorMessage: string | null = null;
   opponentGone = false;
-  autoEnded = false; // already sent this round's turn when the timer ran out
   // What was planned when we locked in, to hand back if the server rejects it.
   planned: Pick<RandomBattleScene, "staged" | "stagedUltimate" | "stagedTargets" | "orders"> | null = null;
 
@@ -73,13 +72,8 @@ export class RandomBattleScene extends BattleScene {
       }),
       match.onConnectionChange(() => this.render()),
     ];
-    // Countdown tick. A plain interval, not this.time: the recap speed
-    // setting scales Phaser's clock.
-    const tick = window.setInterval(() => this.onTick(), 250);
-    this.events.once("shutdown", () => {
-      window.clearInterval(tick);
-      unsubscribe.forEach((off) => off());
-    });
+    // The countdown itself ticks in BattleScene (onTurnTick).
+    this.events.once("shutdown", () => unsubscribe.forEach((off) => off()));
     return toBattleView(match.latest!);
   }
 
@@ -101,24 +95,12 @@ export class RandomBattleScene extends BattleScene {
     return super.canAct() && !this.battle.myReady && !this.pendingPick && !this.match.closed && !this.match.reconnecting;
   }
 
-  // Whole seconds left until the local deadline, or null.
-  private secondsLeft(deadline: number | null): number | null {
-    return deadline === null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-  }
-
-  // Runs 4x a second: refresh the countdowns, and end the turn for the
-  // player when time runs out (with whatever they had planned, if it can
-  // still be paid for; otherwise a pass).
-  private onTick(): void {
+  // Follow the server's clock: refresh the countdowns, and end the turn for
+  // the player when time runs out.
+  override onTurnTick(): void {
     if (!this.statusText?.active || isBattleOver(this.battle)) return;
-    const left = this.match.turnDeadline === null ? null : this.match.turnDeadline - Date.now();
-    if (left !== null && left <= 0 && !this.autoEnded && this.canAct()) {
-      this.autoEnded = true;
-      this.handHint = null;
-      this.onEndTurnClick();
-      if (!this.pendingPick) this.commitAction(passAction()); // plan couldn't be paid for
-      return;
-    }
+    this.turnDeadline = this.match.turnDeadline;
+    if (this.autoEndTurnIfTimeUp()) return;
     this.statusText.setText(this.statusMessage());
   }
 

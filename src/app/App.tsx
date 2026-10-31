@@ -6,10 +6,9 @@ import { ClassSelect } from "../components/ClassSelect.tsx";
 import { DeckBuilder } from "../components/DeckBuilder.tsx";
 import { Gallery } from "../components/Gallery.tsx";
 import { MatchHistory } from "../components/MatchHistory.tsx";
-import { Lobby, type LobbyReady } from "../components/Lobby.tsx";
+import { Lobby } from "../components/Lobby.tsx";
 import { Dialog, type DialogProps } from "../components/Dialog.tsx";
 import { PhaserBattle } from "../components/PhaserBattle.tsx";
-import { PhaserOnlineBattle } from "../components/PhaserOnlineBattle.tsx";
 import { RandomLobby } from "../components/RandomLobby.tsx";
 import { PhaserRandomBattle } from "../components/PhaserRandomBattle.tsx";
 import type { RandomMatch } from "../online/randomMatch.ts";
@@ -37,7 +36,6 @@ type Screen =
   | { name: "battle"; playerClassId: string; deck: DeckChoice }
   | { name: "lobby-create"; playerClass: ClassDef; deck: DeckChoice }
   | { name: "lobby-join"; playerClass: ClassDef; deck: DeckChoice; code: string }
-  | { name: "online-battle"; ready: LobbyReady }
   | { name: "lobby-random"; playerClass: ClassDef; deck: DeckChoice }
   | { name: "random-battle"; match: RandomMatch };
 
@@ -214,7 +212,7 @@ export function App(): ReactElement {
           playerClass={screen.playerClass}
           deckId={screen.deck.id}
           deckName={screen.deck.name}
-          onReady={(ready) => setScreen({ name: "online-battle", ready })}
+          onReady={(match) => setScreen({ name: "random-battle", match })}
           onBack={toMenu}
         />
       );
@@ -227,19 +225,8 @@ export function App(): ReactElement {
           deckId={screen.deck.id}
           deckName={screen.deck.name}
           code={screen.code}
-          onReady={(ready) => setScreen({ name: "online-battle", ready })}
+          onReady={(match) => setScreen({ name: "random-battle", match })}
           onBack={toMenu}
-        />
-      );
-      break;
-    case "online-battle":
-      body = (
-        <PhaserOnlineBattle
-          matchId={screen.ready.matchId}
-          userId={screen.ready.userId}
-          match={screen.ready.match}
-          hand={screen.ready.hand}
-          onExit={toMenuAfterOnlineGame}
         />
       );
       break;

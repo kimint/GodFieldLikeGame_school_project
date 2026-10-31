@@ -1,4 +1,5 @@
-// Random match through the Colyseus server (server/BattleRoom.ts). The room
+// Random match and private rooms through the Colyseus server
+// (server/BattleRoom.ts). The room
 // lives from the lobby ("looking for an opponent") into the battle scene, so
 // this wrapper keeps the latest view and hands it to whoever is listening.
 import { Client, type Room } from "@colyseus/sdk";
@@ -31,6 +32,7 @@ function savedToken(): string | null {
 }
 
 export class RandomMatch {
+  readonly code: string; // the room id; for a private room, the code to share
   latest: RandomMatchView | null = null;
   closed = false;
   reconnecting = false; // our own connection dropped; the SDK is retrying
@@ -43,6 +45,7 @@ export class RandomMatch {
   private connectionListeners = new Set<() => void>();
 
   constructor(private room: Room) {
+    this.code = room.roomId;
     saveToken(room.reconnectionToken);
     room.onMessage("state", (view: RandomMatchView) => {
       const now = Date.now();
@@ -105,21 +108,59 @@ export class RandomMatch {
   }
 }
 
-export async function findRandomMatch(classId: string, deckId: string | null): Promise<RandomMatch> {
+// The Supabase login the server checks in onAuth.
+async function accessToken(): Promise<string> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error("Log in to an account to play online");
-  const client = new Client(COLYSEUS_URL);
-  // A reloaded tab still inside its 30 seconds goes back to the same match.
+  return token;
+}
+
+// A reloaded tab still inside its 30 seconds goes back to the same match.
+async function resumeSavedMatch(client: Client): Promise<RandomMatch | null> {
   const previous = savedToken();
-  if (previous) {
-    try {
-      return new RandomMatch(await client.reconnect(previous));
-    } catch {
-      saveToken(null); // too late, or that match is over
-    }
+  if (!previous) return null;
+  try {
+    return new RandomMatch(await client.reconnect(previous));
+  } catch {
+    saveToken(null); // too late, or that match is over
+    return null;
   }
+}
+
+export async function findRandomMatch(classId: string, deckId: string | null): Promise<RandomMatch> {
+  const token = await accessToken();
+  const client = new Client(COLYSEUS_URL);
+  const resumed = await resumeSavedMatch(client);
+  if (resumed) return resumed;
   // Joins a room that is waiting for a second player, or opens a new one.
   const room = await client.joinOrCreate("battle", { token, classId, deckId });
   return new RandomMatch(room);
+}
+
+// Private room: a room only reachable by its code (the room id). Same
+// server room, so it has the same turn timer and reconnection.
+export async function createPrivateMatch(classId: string, deckId: string | null): Promise<RandomMatch> {
+  const token = await accessToken();
+  const client = new Client(COLYSEUS_URL);
+  const resumed = await resumeSavedMatch(client);
+  if (resumed) return resumed;
+  const room = await client.create("battle", { private: true, token, classId, deckId });
+  return new RandomMatch(room);
+}
+
+export async function joinPrivateMatch(code: string, classId: string, deckId: string | null): Promise<RandomMatch> {
+  const token = await accessToken();
+  const client = new Client(COLYSEUS_URL);
+  const resumed = await resumeSavedMatch(client);
+  if (resumed) return resumed;
+  const roomCode = code.trim().toUpperCase();
+  try {
+    return new RandomMatch(await client.joinById(roomCode, { token, classId, deckId }));
+  } catch (err) {
+    const message = (err as Error).message ?? "";
+    // The server's own reasons (own room, bad deck, ...) are shown as-is.
+    if (/not found|locked|full|invalid/i.test(message)) throw new Error(`No open room with code ${roomCode}`);
+    throw err;
+  }
 }
