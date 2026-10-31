@@ -20,6 +20,7 @@ interface JoinOptions {
 interface Seat {
   client: Client;
   userId: string;
+  username: string;
   classDef: ClassDef;
   deckList: DeckListEntry[] | null;
   pick: Action | null;
@@ -38,12 +39,16 @@ export class BattleRoom extends Room {
   private battle: Battle | null = null;
   private turnEndsAt: number | null = null;
   private turnTimer: Delayed | null = null;
+  private recorded = false;
 
   // Runs before onJoin: check the Supabase login and the chosen deck.
   async onAuth(_client: Client, options: JoinOptions) {
     const { data, error } = await admin.auth.getUser(options.token ?? "");
     if (error || !data.user || data.user.is_anonymous) throw new Error("Log in to an account to play online");
     const userId = data.user.id;
+    // Same display name as src/online/authApi.ts toAccount().
+    const username =
+      (data.user.user_metadata?.["username"] as string | undefined) || data.user.email?.split("@")[0] || "Player";
     if (this.seats.some((s) => s.userId === userId)) throw new Error("You're already in this match");
 
     const classDef = findClassById(String(options.classId));
@@ -60,10 +65,14 @@ export class BattleRoom extends Room {
       if (problem) throw new Error(`That deck can't be used: ${problem}`);
       deckList = deck.cards as DeckListEntry[];
     }
-    return { userId, classDef, deckList };
+    return { userId, username, classDef, deckList };
   }
 
-  onJoin(client: Client, _options: JoinOptions, auth: { userId: string; classDef: ClassDef; deckList: DeckListEntry[] | null }) {
+  onJoin(
+    client: Client,
+    _options: JoinOptions,
+    auth: { userId: string; username: string; classDef: ClassDef; deckList: DeckListEntry[] | null }
+  ) {
     this.seats.push({ client, ...auth, pick: null, reconnectBy: null });
     if (this.seats.length < 2) {
       client.send("waiting");
@@ -104,6 +113,7 @@ export class BattleRoom extends Room {
     p1.pick = p2.pick = null;
     if (isBattleOver(this.battle)) {
       this.stopTurnTimer();
+      void this.recordResult();
       this.sendViews();
       this.disconnect();
       return;
@@ -158,9 +168,33 @@ export class BattleRoom extends Room {
     if (other) {
       this.battle.winner = this.fighterOf(other);
       this.battle.log.unshift("Opponent left the match.");
+      void this.recordResult();
       this.sendViews();
     }
     this.disconnect();
+  }
+
+  // Both players' match_history rows, once per battle -- the table's trigger
+  // (supabase/migrations/*_match_history.sql) updates pvp_records and keeps
+  // only the last 5. A failed write only costs the record, not the match.
+  private async recordResult() {
+    const battle = this.battle;
+    if (!battle || this.recorded || this.seats.length < 2) return;
+    this.recorded = true;
+    const rows = this.seats.map((seat) => {
+      const me = this.fighterOf(seat);
+      const other = this.otherSeat(seat)!;
+      return {
+        user_id: seat.userId,
+        result: battle.draw ? "draw" : battle.winner === me ? "win" : "loss",
+        my_class: seat.classDef.id,
+        opponent_class: other.classDef.id,
+        opponent_name: other.username,
+        rounds: battle.round,
+      };
+    });
+    const { error } = await admin.from("match_history").insert(rows);
+    if (error) console.error("Couldn't save match history:", error.message);
   }
 
   private seatOf(client: Client) {

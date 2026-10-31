@@ -20,6 +20,7 @@ export interface ClassSelectProps {
   onJoinOnline: (classId: string) => void;
   onRandomOnline: (classId: string) => void;
   onOpenGallery: () => void;
+  onOpenRecord: () => void;
 }
 
 /** Class-select screen (React shell): one card per class, its decks, and vs-CPU / online buttons. */
@@ -38,6 +39,7 @@ export function ClassSelect({
   onJoinOnline,
   onRandomOnline,
   onOpenGallery,
+  onOpenRecord,
 }: ClassSelectProps): ReactElement {
   const [selectedId, setSelectedId] = useState<string>(initialClassId ?? classes[0]?.id ?? "");
   const selected = classes.find((c) => c.id === selectedId) ?? classes[0];
@@ -58,6 +60,11 @@ export function ClassSelect({
                 Log out
               </button>
             </>
+          ) : null}
+          {account ? (
+            <button type="button" className="shell-button" onClick={onOpenRecord}>
+              My record
+            </button>
           ) : null}
           <button type="button" className="shell-button" onClick={onOpenGallery}>
             Card gallery

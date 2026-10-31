@@ -5,6 +5,7 @@ import { AuthScreen } from "../components/AuthScreen.tsx";
 import { ClassSelect } from "../components/ClassSelect.tsx";
 import { DeckBuilder } from "../components/DeckBuilder.tsx";
 import { Gallery } from "../components/Gallery.tsx";
+import { MatchHistory } from "../components/MatchHistory.tsx";
 import { Lobby, type LobbyReady } from "../components/Lobby.tsx";
 import { Dialog, type DialogProps } from "../components/Dialog.tsx";
 import { PhaserBattle } from "../components/PhaserBattle.tsx";
@@ -18,6 +19,7 @@ import type { ClassDef } from "../model/classes.ts";
 import { onlineAvailable } from "../online/supabaseClient.ts";
 import { logOut } from "../online/authApi.ts";
 import { listDecks, type SavedDeck } from "../online/decksApi.ts";
+import { fetchMatchHistory, type MatchHistoryData } from "../online/historyApi.ts";
 
 // The deck a player takes into a match: a saved deck, or the starter deck
 // (id null, list null).
@@ -30,6 +32,7 @@ interface DeckChoice {
 type Screen =
   | { name: "menu" }
   | { name: "gallery" }
+  | { name: "record" }
   | { name: "decks"; classId: string }
   | { name: "battle"; playerClassId: string; deck: DeckChoice }
   | { name: "lobby-create"; playerClass: ClassDef; deck: DeckChoice }
@@ -48,6 +51,8 @@ export function App(): ReactElement {
   const [decks, setDecks] = useState<SavedDeck[]>([]);
   const [decksError, setDecksError] = useState<string | null>(null);
   const [selectedDeckIds, setSelectedDeckIds] = useState<Record<string, string | null>>({});
+  const [history, setHistory] = useState<MatchHistoryData | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const accountId = auth.account?.id ?? null;
 
@@ -61,14 +66,29 @@ export function App(): ReactElement {
     }
   }, [accountId]);
 
-  // A different (or no) account: drop the old one's decks and go back to the menu.
+  // The "My record" screen's data is loaded here, not by the screen itself,
+  // so opening it again doesn't refetch -- only a finished game can change it.
+  const reloadHistory = useCallback(async (): Promise<void> => {
+    if (!accountId) return;
+    try {
+      setHistory(await fetchMatchHistory());
+      setHistoryError(null);
+    } catch (err) {
+      setHistoryError((err as Error).message);
+    }
+  }, [accountId]);
+
+  // A different (or no) account: drop the old one's decks and history and go back to the menu.
   useEffect(() => {
     setDecks([]);
     setDecksError(null);
     setSelectedDeckIds({});
+    setHistory(null);
+    setHistoryError(null);
     setScreen({ name: "menu" });
     void reloadDecks();
-  }, [accountId, reloadDecks]);
+    void reloadHistory();
+  }, [accountId, reloadDecks, reloadHistory]);
 
   if (!catalog.ready || !auth.ready) {
     return (
@@ -137,10 +157,35 @@ export function App(): ReactElement {
 
   const toMenu = (): void => setScreen({ name: "menu" });
 
+  // Back to the menu from an online battle: the game may have just been
+  // recorded, so refresh the record. (vs-CPU games aren't recorded.)
+  const toMenuAfterOnlineGame = (): void => {
+    toMenu();
+    void reloadHistory();
+  };
+
+  // Random matches are recorded by the Colyseus server, and a forfeit is only
+  // written after this player has already left -- refresh once more a moment
+  // later to pick that up.
+  const toMenuAfterRandomGame = (): void => {
+    toMenuAfterOnlineGame();
+    setTimeout(() => void reloadHistory(), 2000);
+  };
+
   let body: ReactElement;
   switch (screen.name) {
     case "gallery":
       body = <Gallery onBack={toMenu} />;
+      break;
+    case "record":
+      body = (
+        <MatchHistory
+          username={auth.account?.username ?? "Player"}
+          history={history}
+          error={historyError}
+          onBack={toMenu}
+        />
+      );
       break;
     case "decks": {
       const classDef = findClassById(screen.classId);
@@ -194,7 +239,7 @@ export function App(): ReactElement {
           userId={screen.ready.userId}
           match={screen.ready.match}
           hand={screen.ready.hand}
-          onExit={toMenu}
+          onExit={toMenuAfterOnlineGame}
         />
       );
       break;
@@ -210,7 +255,7 @@ export function App(): ReactElement {
       );
       break;
     case "random-battle":
-      body = <PhaserRandomBattle match={screen.match} onExit={toMenu} />;
+      body = <PhaserRandomBattle match={screen.match} onExit={toMenuAfterRandomGame} />;
       break;
     case "menu":
     default:
@@ -241,6 +286,7 @@ export function App(): ReactElement {
             startWith(classId, (playerClass, deck) => setScreen({ name: "lobby-random", playerClass, deck }))
           }
           onOpenGallery={() => setScreen({ name: "gallery" })}
+          onOpenRecord={() => setScreen({ name: "record" })}
         />
       );
       break;
