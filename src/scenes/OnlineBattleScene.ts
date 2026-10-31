@@ -134,7 +134,9 @@ export class OnlineBattleScene extends BattleScene {
       });
       if (!leave || !this.sys.isActive()) return;
       // The match may have ended while the dialog was open.
-      if (!isBattleOver(this.battle)) leaveMatch(this.matchId).catch(() => {});
+      // Waited for so the forfeit is already in match_history when the menu
+      // reloads it.
+      if (!isBattleOver(this.battle)) await leaveMatch(this.matchId).catch(() => {});
     }
     if (this.onExit) {
       this.onExit();
