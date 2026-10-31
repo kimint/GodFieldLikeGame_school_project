@@ -5,9 +5,9 @@
 import { Client, type Room } from "@colyseus/sdk";
 import { supabase } from "./supabaseClient.ts";
 import { toClientAction, type Action } from "../model/engine.ts";
-import type { RandomMatchView } from "./randomMatchView.ts";
+import type { RandomMatchView, RematchEndReason } from "./randomMatchView.ts";
 
-export type { RandomMatchView };
+export type { RandomMatchView, RematchEndReason };
 
 const COLYSEUS_URL = import.meta.env.VITE_COLYSEUS_URL ?? "ws://localhost:2567";
 // Lets a reloaded tab get back into its match (the server holds the seat for
@@ -39,21 +39,34 @@ export class RandomMatch {
   // Local-clock deadlines (ms) from the latest view.
   turnDeadline: number | null = null;
   opponentDeadline: number | null = null;
+  rematchDeadline: number | null = null; // while the post-battle rematch window is open
+  rematchEnded: RematchEndReason | null = null; // why the room closed without a rematch
   private viewListeners = new Set<(view: RandomMatchView) => void>();
   private errorListeners = new Set<(message: string) => void>();
   private closeListeners = new Set<() => void>();
   private connectionListeners = new Set<() => void>();
+  private newGameListeners = new Set<() => void>();
+  private rematchEndListeners = new Set<(reason: RematchEndReason) => void>();
 
   constructor(private room: Room) {
     this.code = room.roomId;
     saveToken(room.reconnectionToken);
     room.onMessage("state", (view: RandomMatchView) => {
       const now = Date.now();
+      const newGame = this.latest !== null && view.game !== this.latest.game;
       this.latest = view;
       this.turnDeadline = view.turnMsLeft === null ? null : now + view.turnMsLeft;
       this.opponentDeadline = view.opponentReconnectMsLeft === null ? null : now + view.opponentReconnectMsLeft;
-      if (view.over) saveToken(null);
-      for (const l of this.viewListeners) l(view);
+      this.rematchDeadline = view.rematchMsLeft === null ? null : now + view.rematchMsLeft;
+      // A rematch started: the battle screen starts over instead of updating.
+      if (newGame) for (const l of this.newGameListeners) l();
+      else for (const l of this.viewListeners) l(view);
+    });
+    room.onMessage("rematchEnded", (reason: RematchEndReason) => {
+      this.rematchEnded = reason;
+      this.rematchDeadline = null;
+      saveToken(null);
+      for (const l of this.rematchEndListeners) l(reason);
     });
     room.onMessage("error", (message: string) => {
       for (const l of this.errorListeners) l(message);
@@ -80,6 +93,21 @@ export class RandomMatch {
   onConnectionChange(listener: () => void): () => void {
     this.connectionListeners.add(listener);
     return () => this.connectionListeners.delete(listener);
+  }
+
+  onNewGame(listener: () => void): () => void {
+    this.newGameListeners.add(listener);
+    return () => this.newGameListeners.delete(listener);
+  }
+
+  onRematchEnded(listener: (reason: RematchEndReason) => void): () => void {
+    this.rematchEndListeners.add(listener);
+    return () => this.rematchEndListeners.delete(listener);
+  }
+
+  // Ask for a rematch once the battle is over.
+  rematch(): void {
+    if (!this.closed) this.room.send("rematch");
   }
 
   onView(listener: (view: RandomMatchView) => void): () => void {

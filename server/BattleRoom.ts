@@ -13,7 +13,7 @@ import { findClassById } from "../src/model/catalog.ts";
 import { buildDeckFromList, validateDeckList, type DeckListEntry } from "../src/model/decks.ts";
 import { serializeFighter } from "../src/model/serialize.ts";
 import type { ClassDef } from "../src/model/classes.ts";
-import type { RandomMatchView } from "../src/online/randomMatchView.ts";
+import type { RandomMatchView, RematchEndReason } from "../src/online/randomMatchView.ts";
 import { admin } from "./supabase.ts";
 
 interface JoinOptions {
@@ -30,6 +30,7 @@ interface Seat {
   classDef: ClassDef;
   deckList: DeckListEntry[] | null;
   pick: Action | null;
+  rematch: boolean; // pressed Rematch on the result screen
   reconnectBy: number | null; // while dropped: when the seat is given up (ms)
 }
 
@@ -44,6 +45,8 @@ function randomCode(): string {
 
 const RECONNECT_SECONDS = 30;
 const TURN_SECONDS = 30;
+// After a battle ends, both players get this long to press Rematch.
+const REMATCH_SECONDS = 30;
 // Extra time after the turn ends before the server passes for a player, so a
 // turn the browser auto-sends at 0s still arrives in time.
 const TURN_GRACE_MS = 2000;
@@ -55,6 +58,9 @@ export class BattleRoom extends Room {
   private turnEndsAt: number | null = null;
   private turnTimer: Delayed | null = null;
   private recorded = false;
+  private game = 0; // counts battles in this room; goes up on each rematch
+  private rematchEndsAt: number | null = null;
+  private rematchTimer: Delayed | null = null;
 
   // Runs before onJoin: check the Supabase login and the chosen deck.
   async onAuth(_client: Client, options: JoinOptions) {
@@ -88,16 +94,29 @@ export class BattleRoom extends Room {
     _options: JoinOptions,
     auth: { userId: string; username: string; classDef: ClassDef; deckList: DeckListEntry[] | null }
   ) {
-    this.seats.push({ client, ...auth, pick: null, reconnectBy: null });
+    this.seats.push({ client, ...auth, pick: null, rematch: false, reconnectBy: null });
     if (this.seats.length < 2) {
       client.send("waiting");
       return;
     }
+    this.startBattle();
+  }
+
+  // A new battle with both seats' classes and decks: the first one, and
+  // each rematch.
+  private startBattle() {
     const [p1, p2] = this.seats as [Seat, Seat];
     this.battle = createBattle(p1.classDef, p2.classDef, {
       playerDeck: p1.deckList ? buildDeckFromList(p1.deckList) : null,
       cpuDeck: p2.deckList ? buildDeckFromList(p2.deckList) : null,
     });
+    this.game++;
+    this.recorded = false;
+    for (const seat of this.seats) {
+      seat.pick = null;
+      seat.rematch = false;
+    }
+    this.stopRematchTimer();
     this.startTurnTimer();
     this.sendViews();
   }
@@ -122,6 +141,14 @@ export class BattleRoom extends Room {
       seat.pick = picked;
       this.resolveIfReady();
     });
+    // Rematch: once both press it before the window closes, a new battle starts.
+    this.onMessage("rematch", (client) => {
+      const seat = this.seatOf(client);
+      if (!seat || seat.rematch || this.rematchEndsAt === null) return;
+      seat.rematch = true;
+      if (this.seats.every((s) => s.rematch)) this.startBattle();
+      else this.sendViews(); // the opponent sees "wants a rematch"
+    });
   }
 
   // Resolve the round once both players have locked in; otherwise just show
@@ -136,8 +163,8 @@ export class BattleRoom extends Room {
     if (isBattleOver(this.battle)) {
       this.stopTurnTimer();
       void this.recordResult();
+      this.startRematchTimer();
       this.sendViews();
-      this.disconnect();
       return;
     }
     this.startTurnTimer();
@@ -162,9 +189,34 @@ export class BattleRoom extends Room {
     this.turnEndsAt = null;
   }
 
+  // The rematch window. If it runs out before both press Rematch, everyone
+  // goes back to the lobby.
+  private startRematchTimer() {
+    this.stopRematchTimer();
+    this.rematchEndsAt = Date.now() + REMATCH_SECONDS * 1000;
+    this.rematchTimer = this.clock.setTimeout(() => this.endRoom("timeout"), REMATCH_SECONDS * 1000);
+  }
+
+  private stopRematchTimer() {
+    this.rematchTimer?.clear();
+    this.rematchTimer = null;
+    this.rematchEndsAt = null;
+  }
+
+  // No rematch: tell whoever is still here why, then close the room.
+  private endRoom(reason: RematchEndReason) {
+    this.stopRematchTimer();
+    this.lock(); // nobody new can take the empty seat in the meantime
+    for (const seat of this.seats) if (seat.reconnectBy === null) seat.client.send("rematchEnded", reason);
+    this.disconnect();
+  }
+
   // Lost connection (closed tab, wifi drop): hold the seat for a while.
   // If they don't come back in time, onLeave counts it as a forfeit.
   async onDrop(client: Client) {
+    // After the battle there's nothing to hold the seat for: the rematch
+    // window is only 30 seconds anyway. onLeave runs right after this.
+    if (this.battle && isBattleOver(this.battle)) return;
     const seat = this.seatOf(client);
     if (seat) seat.reconnectBy = Date.now() + RECONNECT_SECONDS * 1000;
     if (this.battle) this.sendViews(); // the opponent sees the countdown
@@ -189,7 +241,14 @@ export class BattleRoom extends Room {
       this.seats = this.seats.filter((s) => s !== seat);
       return;
     }
-    if (isBattleOver(this.battle)) return;
+    if (isBattleOver(this.battle)) {
+      // Left during the rematch window: no rematch, the other player goes back.
+      if (this.rematchEndsAt !== null) {
+        this.seats = this.seats.filter((s) => s !== seat);
+        this.endRoom("opponentLeft");
+      }
+      return;
+    }
     this.stopTurnTimer();
     const other = this.otherSeat(seat);
     if (other) {
@@ -256,6 +315,10 @@ export class BattleRoom extends Room {
         // Time left, not a timestamp, so the browser's clock doesn't matter.
         turnMsLeft: this.turnEndsAt === null ? null : Math.max(0, this.turnEndsAt - now),
         opponentReconnectMsLeft: other?.reconnectBy == null ? null : Math.max(0, other.reconnectBy - now),
+        game: this.game,
+        rematchMsLeft: this.rematchEndsAt === null ? null : Math.max(0, this.rematchEndsAt - now),
+        myRematch: seat.rematch,
+        opponentRematch: other?.rematch ?? false,
         result: battle.draw ? "draw" : battle.winner === me ? "win" : battle.winner ? "lose" : null,
       } satisfies RandomMatchView);
     }

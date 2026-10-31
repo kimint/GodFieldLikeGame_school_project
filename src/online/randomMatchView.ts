@@ -14,4 +14,11 @@ export interface RandomMatchView {
   opponentReady: boolean;
   turnMsLeft: number | null; // time left to end this turn; null when the match is over
   opponentReconnectMsLeft: number | null; // set while the opponent is disconnected
+  game: number; // which battle in this room; goes up on each rematch
+  rematchMsLeft: number | null; // set while the post-battle rematch window is open
+  myRematch: boolean; // I pressed Rematch
+  opponentRematch: boolean; // the opponent pressed Rematch
 }
+
+// Sent as "rematchEnded" just before the room closes after a battle.
+export type RematchEndReason = "timeout" | "opponentLeft";

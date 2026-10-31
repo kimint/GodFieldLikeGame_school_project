@@ -350,6 +350,14 @@ export interface BattleSceneData {
   onExit?: (() => void) | null;
 }
 
+// One button on the end-of-game screen.
+export interface ResultAction {
+  label: string;
+  color: number;
+  hoverColor: number;
+  onClick: () => void;
+}
+
 export interface HpPair {
   player: number;
   cpu: number;
@@ -375,6 +383,8 @@ export class BattleScene extends Phaser.Scene {
   settingsMenu: Phaser.GameObjects.Container | null = null; // the settings dropdown, while open
   speedButton!: Button; // replay speed; its label follows the settings menu's speed slider
   resultDismissed = false; // closed with "View board"
+  resultButtons: Button[] = []; // the end-of-game screen's buttons, in resultActions() order
+  resultNote: Phaser.GameObjects.Text | null = null; // a line under them, for subclasses (rematch)
   cpuPanel!: Phaser.GameObjects.Container;
   playerPanel!: Phaser.GameObjects.Container;
   cpuPortrait!: Phaser.GameObjects.Container;
@@ -487,6 +497,14 @@ export class BattleScene extends Phaser.Scene {
     return `${this.opponentLabel} (${opponent}) wins in round ${b.round}.`;
   }
 
+  // The end-of-game screen's buttons. Online scenes swap in Rematch / Leave.
+  resultActions(): ResultAction[] {
+    return [
+      { label: "Back to menu", color: COLORS.ultimate, hoverColor: COLORS.ultimateHover, onClick: () => void this.onLeave() },
+      { label: "View board", color: COLORS.restart, hoverColor: COLORS.restartHover, onClick: () => this.hideResult() },
+    ];
+  }
+
   // Whether the hand/ultimate should take clicks right now.
   canAct(): boolean {
     return !isBattleOver(this.battle) && !this.recapPlaying;
@@ -595,6 +613,8 @@ export class BattleScene extends Phaser.Scene {
     this.recapSpeed = readRecapSpeed();
     this.resultLayer = null; // the end-of-game screen, once shown
     this.resultDismissed = false; // closed with "View board"
+    this.resultButtons = [];
+    this.resultNote = null;
     this.turnDeadline = null;
     this.turnTimerRound = 0;
     this.autoEnded = false;
@@ -1066,20 +1086,31 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     layer.add([title, subtitle, summary]);
 
-    const primary = createButton(this, cx - 170, cy + 150, 160, 44, "Back to menu", {
-      color: COLORS.ultimate,
-      hoverColor: COLORS.ultimateHover,
-      onClick: () => this.onLeave(),
-    });
-    const secondary = createButton(this, cx + 10, cy + 150, 160, 44, "View board", {
-      color: COLORS.restart,
-      hoverColor: COLORS.restartHover,
-      onClick: () => this.hideResult(),
-    });
-    layer.add([primary.container, secondary.container]);
+    // The buttons, centered side by side.
+    const actions = this.resultActions();
+    const buttonW = 160;
+    const gap = 20;
+    const left = cx - (actions.length * buttonW + (actions.length - 1) * gap) / 2;
+    this.resultButtons = actions.map((a, i) =>
+      createButton(this, left + i * (buttonW + gap), cy + 150, buttonW, 44, a.label, {
+        color: a.color,
+        hoverColor: a.hoverColor,
+        onClick: a.onClick,
+      })
+    );
+    const note = this.add
+      .text(cx, cy + 210, "", { fontFamily: FONT_FAMILY, fontSize: "16px", fontStyle: "700", color: TEXT.white, align: "center" })
+      .setOrigin(0.5, 0);
+    this.resultNote = note;
+    layer.add([...this.resultButtons.map((b) => b.container), note]);
 
     // Entrance: a stamp for VICTORY, a heavy drop for DEFEAT, a fade for DRAW.
-    const details: Array<Phaser.GameObjects.Container | Phaser.GameObjects.Text> = [subtitle, summary, primary.container, secondary.container];
+    const details: Array<Phaser.GameObjects.Container | Phaser.GameObjects.Text> = [
+      subtitle,
+      summary,
+      ...this.resultButtons.map((b) => b.container),
+      note,
+    ];
     details.forEach((o) => o.setAlpha(0));
     dim.setAlpha(0);
     this.tweens.add({ targets: dim, alpha: 1, duration: 250 });
