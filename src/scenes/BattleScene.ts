@@ -1527,8 +1527,8 @@ export class BattleScene extends Phaser.Scene {
     // Leave Match, under it: back to the menu (online matches ask first,
     // since leaving counts as a loss).
     const leave = createButton(this, pad, 188, w - pad * 2, 32, this.leaveLabel, {
-      color: COLORS.restart,
-      hoverColor: COLORS.restartHover,
+      color: COLORS.ultimate,
+      hoverColor: COLORS.ultimateHover,
       onClick: () => {
         this.closeSettings();
         void this.onLeave();
