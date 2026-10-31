@@ -300,7 +300,9 @@ showing their category icon, as does any card whose image fails to load. `image_
 
 Every current card has an illustration in `card-art/*.svg`, generated from
 `scripts/card-art.ts` (one emblem per card id, plus a generic per-category emblem for cards
-without one). Edit the script, then:
+without one). A card with painted art at `public/cards/<card id>.png` / `.jpg` / `.webp` (e.g.
+`iron_skin.jpg`) uses that instead — the upload below points its `image_url` at that file rather
+than its SVG. Edit the script, then:
 
 ```bash
 npm run cards:art                 # regenerate card-art/*.svg

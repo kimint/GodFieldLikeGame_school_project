@@ -12,6 +12,7 @@ import {
   type DeckListEntry,
 } from "../model/decks.ts";
 import { createDeck, deleteDeck, updateDeck, type SavedDeck } from "../online/decksApi.ts";
+import { FramedCard } from "./FramedCard.tsx";
 
 export interface DeckBuilderProps {
   classDef: ClassDef;
@@ -304,17 +305,7 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
         <aside className="deck-panel deck-detail">
           {selected ? (
             <>
-              {selected.imageUrl ? (
-                <img className="deck-detail-art" src={selected.imageUrl} alt="" />
-              ) : (
-                <div className={`deck-detail-art gallery-art fallback ${selected.category}`}>{selected.category}</div>
-              )}
-              <div className="deck-detail-name">{selected.name}</div>
-              <div className="deck-detail-meta">
-                <span className={`deck-detail-cat ${selected.category}`}>{CATEGORY_LABEL[selected.category]}</span>
-                <span>{cardCost(selected.props)} AP</span>
-              </div>
-              <p className="deck-detail-text">{describeCard(asCard(selected))}</p>
+              <FramedCard card={selected} description={describeCard(asCard(selected))} />
               {selected.category === "monster" ? (
                 <p className="deck-detail-text">{describeMonsterOrders(asCard(selected))}</p>
               ) : null}
