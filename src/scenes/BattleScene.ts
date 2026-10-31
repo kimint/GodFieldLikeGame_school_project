@@ -592,9 +592,14 @@ export class BattleScene extends Phaser.Scene {
     const settingsButton = createCircleButton(this, SETTINGS.x, SETTINGS.y, SETTINGS.r, "", {
       color: COLORS.restart,
       hoverColor: COLORS.restartHover,
-      onClick: () => (this.settingsMenu ? this.closeSettings() : this.openSettings()),
+      onClick: () => this.toggleSettings(),
     });
     settingsButton.container.setDepth(951);
+    // Esc does the same. Not over the end-of-game screen, which sits above
+    // the menu; the confirm dialogs catch Esc themselves before Phaser sees it.
+    this.input.keyboard?.on("keydown-ESC", () => {
+      if (!this.resultLayer) this.toggleSettings();
+    });
     // The gear nearly fills the button; hovering also turns it a notch.
     if (this.textures.exists(SETTINGS_ICON_KEY)) {
       const gear = this.add.image(0, 0, SETTINGS_ICON_KEY).setDisplaySize(SETTINGS.r * 2 - 4, SETTINGS.r * 2 - 4);
@@ -1451,7 +1456,8 @@ export class BattleScene extends Phaser.Scene {
   // The settings dropdown: a tab hugging the gear that widens into a panel
   // below it, with a volume slider, a stepped replay speed slider and, at the
   // bottom, an account settings button (placeholder for now) and Leave
-  // Match. A click anywhere outside it (or on the gear again) closes it.
+  // Match. Esc opens it too; a click anywhere outside it (or on the gear, or
+  // Esc again) closes it.
   openSettings(): void {
     this.closeSettings();
     const { x, y, w, tab, pad } = SETTINGS_MENU;
@@ -1566,6 +1572,11 @@ export class BattleScene extends Phaser.Scene {
     // Drop down from the gear.
     body.setAlpha(0).setY(y - 10);
     this.tweens.add({ targets: body, alpha: 1, y, duration: 160, ease: "Cubic.easeOut" });
+  }
+
+  toggleSettings(): void {
+    if (this.settingsMenu) this.closeSettings();
+    else this.openSettings();
   }
 
   closeSettings(): void {
