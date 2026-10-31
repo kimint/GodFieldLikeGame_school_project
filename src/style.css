@@ -552,7 +552,7 @@ body {
   margin: 0;
   font-size: 13px;
   line-height: 1.45;
-  color: #c9ccda;
+  color: #cbccd0;
 }
 
 .deck-detail-stepper {
@@ -579,7 +579,7 @@ body {
   min-height: 220px;
   margin-top: 12px;
   padding: 10px;
-  border: 2px dashed #3a4157;
+  border: 2px dashed #3d3f44;
   border-radius: 10px;
   background: #1b1f2c;
   align-content: start;
@@ -613,8 +613,8 @@ body {
   padding: 4px 10px;
   border: 0;
   border-radius: 999px;
-  background: #2f354a;
-  color: #c9ccda;
+  background: #333539;
+  color: #cbccd0;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -642,7 +642,7 @@ body {
   position: relative;
   display: block;
   padding: 0;
-  border: 2px solid #2f354a;
+  border: 2px solid #333539;
   border-radius: 8px;
   background: #1b1f2c;
   color: #ffffff;
@@ -655,7 +655,7 @@ body {
 
 .card-tile:hover {
   transform: translateY(-2px);
-  border-color: #6a7598;
+  border-color: #6c6f76;
 }
 
 .card-tile.selected {

@@ -87,12 +87,6 @@ const CPU_PORTRAIT_Y = 44;
 const PLAYER_STRIP_X = PORTRAIT_X;
 const PLAYER_STRIP_W = STRIP_X + STRIP_W - PLAYER_STRIP_X;
 
-// Left-column buttons, between the portraits.
-const BUTTON_X = 24;
-const BUTTON_W = 176;
-const BUTTON_H = 40;
-const LEAVE_BUTTON_Y = 296;
-
 const HAND_Y = 548;
 const CARD_W = 112;
 const CARD_H = 160;
@@ -468,7 +462,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   get leaveLabel(): string {
-    return "Restart";
+    return "Leave Match";
+  }
+
+  // Where to go once the battle is over (the status line's last words).
+  get leaveHint(): string {
+    return `Choose "${this.leaveLabel}" in the settings menu to go back.`;
   }
 
   // The line under VICTORY / DEFEAT / DRAW.
@@ -533,8 +532,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
   statusMessage(): string {
-    if (this.battle.winner) return `${fighterName(this.battle.winner)} wins! Press "Restart" to play again.`;
-    if (this.battle.draw) return `Draw! Press "Restart" to play again.`;
+    if (this.battle.winner) return `${fighterName(this.battle.winner)} wins! ${this.leaveHint}`;
+    if (this.battle.draw) return `Draw! ${this.leaveHint}`;
     if (this.handHint) return `Round ${this.battle.round} — ${this.handHint}`;
     return `Round ${this.battle.round} — ${this.plannedAp()}/${this.battle.player.maxAp} AP left. Play cards or click your monsters to give orders, then End turn.`;
   }
@@ -643,12 +642,6 @@ export class BattleScene extends Phaser.Scene {
       color: AP_GEM_COLOR,
       hoverColor: 0x4a95e0,
       onClick: () => this.onEndTurnClick(),
-    });
-
-    createButton(this, BUTTON_X, LEAVE_BUTTON_Y, BUTTON_W, BUTTON_H, this.leaveLabel, {
-      color: COLORS.restart,
-      hoverColor: COLORS.restartHover,
-      onClick: () => this.onLeave(),
     });
 
     this.logPanel.add(
@@ -929,8 +922,8 @@ export class BattleScene extends Phaser.Scene {
 
   // VICTORY / DEFEAT / DRAW in the middle of the screen, over everything,
   // once the game is over and the last round's recap has finished. "View
-  // board" closes it to look at the final state; the Restart/Leave button
-  // under the hand still works after that.
+  // board" closes it to look at the final state; Leave Match in the
+  // settings menu still works after that.
   showResult(): void {
     if (this.resultLayer || this.resultDismissed) return;
     const b = this.battle;
@@ -1457,8 +1450,8 @@ export class BattleScene extends Phaser.Scene {
 
   // The settings dropdown: a tab hugging the gear that widens into a panel
   // below it, with a volume slider, a stepped replay speed slider and, at the
-  // bottom, an account settings button (placeholder for now). A click anywhere outside it
-  // (or on the gear again) closes it.
+  // bottom, an account settings button (placeholder for now) and Leave
+  // Match. A click anywhere outside it (or on the gear again) closes it.
   openSettings(): void {
     this.closeSettings();
     const { x, y, w, tab, pad } = SETTINGS_MENU;
@@ -1530,7 +1523,19 @@ export class BattleScene extends Phaser.Scene {
       },
     });
     body.add(account.container);
-    const h = 194;
+
+    // Leave Match, under it: back to the menu (online matches ask first,
+    // since leaving counts as a loss).
+    const leave = createButton(this, pad, 188, w - pad * 2, 32, this.leaveLabel, {
+      color: COLORS.restart,
+      hoverColor: COLORS.restartHover,
+      onClick: () => {
+        this.closeSettings();
+        void this.onLeave();
+      },
+    });
+    body.add(leave.container);
+    const h = 236;
 
     // Background, added under everything once the height is known: one
     // outlined shape, a tab behind the gear (round on top, sharing the gear's
@@ -1595,7 +1600,7 @@ export class BattleScene extends Phaser.Scene {
       }
       for (let i = 0; steps && i < steps; i++) {
         const tx = x + (w * i) / (steps - 1);
-        g.fillStyle(i / (steps - 1) <= v ? 0x121315 : 0x6b7089, 1);
+        g.fillStyle(i / (steps - 1) <= v ? 0x121315 : 0x6c6e74, 1);
         g.fillCircle(tx, y, 2);
       }
       knob.setX(x + w * v);

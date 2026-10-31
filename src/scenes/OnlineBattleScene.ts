@@ -81,10 +81,6 @@ export class OnlineBattleScene extends BattleScene {
     return "Opponent";
   }
 
-  override get leaveLabel(): string {
-    return "Leave";
-  }
-
   override resultSubtitle(): string {
     const b = this.battle;
     // The server logs "Player N left the match." when someone forfeits.
@@ -145,8 +141,8 @@ export class OnlineBattleScene extends BattleScene {
 
   override statusMessage(): string {
     const b = this.battle;
-    if (b.draw) return `Draw! Press "Leave" to go back.`;
-    if (b.winner) return `${b.winner === b.player ? "You win!" : "Your opponent wins."} Press "Leave" to go back.`;
+    if (b.draw) return `Draw! ${this.leaveHint}`;
+    if (b.winner) return `${b.winner === b.player ? "You win!" : "Your opponent wins."} ${this.leaveHint}`;
     if (this.errorMessage) return `Round ${b.round} — ${this.errorMessage}`;
     if (this.pendingPick || b.myReady) {
       const what = this.pendingPick ?? "your move";
