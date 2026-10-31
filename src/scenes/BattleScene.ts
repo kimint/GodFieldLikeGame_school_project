@@ -344,6 +344,22 @@ function ultimateName(classDef: ClassDef): string {
   return name && name !== "TBD" ? name : "Ultimate";
 }
 
+// Board geometry for subclasses that point at parts of the board (the
+// tutorial's coach highlights).
+export const LAYOUT = {
+  cpuStrip: { x: STRIP_X, y: CPU_STRIP_Y, w: STRIP_W, h: STRIP_H },
+  playerStrip: { x: PLAYER_STRIP_X, y: PLAYER_STRIP_Y, w: PLAYER_STRIP_W, h: STRIP_H },
+  cpuPortrait: { x: PORTRAIT_X, y: CPU_PORTRAIT_Y, w: PORTRAIT_W, h: PORTRAIT_H },
+  playerSlot: { x: GAME_WIDTH / 2 + SLOT_TOTAL_W / 2 - SLOT_W, y: SLOT_Y, w: SLOT_W, h: SLOT_H },
+  classBadge: CLASS_BADGE,
+  endTurn: { x: END_TURN.x, y: END_TURN.y, r: END_TURN_RING_R + END_TURN_RING_W },
+  handY: HAND_Y,
+  card: { w: CARD_W, h: CARD_H },
+  monster: { w: MONSTER_W, h: MONSTER_H },
+  logBox: LOG_BOX,
+  logHideDx: LOG_HIDE_DX,
+} as const;
+
 export interface BattleSceneData {
   playerClass: ClassDef;
   playerDeck?: Card[] | null; // a custom deck (decks.ts); null/absent = starter deck

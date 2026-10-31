@@ -1,6 +1,8 @@
 // Player accounts: sign up / log in / log out with email + password
 // (Supabase Auth). The username is kept in the user's metadata and only
-// used for display.
+// used for display. The metadata also carries `tutorial_seen`: false on a
+// fresh account until the player picks "Start tutorial" or "Skip" (absent on
+// accounts made before the tutorial existed, which aren't asked).
 
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./supabaseClient.ts";
@@ -9,13 +11,15 @@ export interface Account {
   id: string;
   email: string;
   username: string;
+  needsTutorialPrompt: boolean; // new account that hasn't answered the tutorial prompt yet
 }
 
 export function toAccount(user: User | null | undefined): Account | null {
   if (!user || user.is_anonymous) return null;
   const email = user.email ?? "";
   const username = (user.user_metadata?.["username"] as string | undefined) || email.split("@")[0] || "Player";
-  return { id: user.id, email, username };
+  const needsTutorialPrompt = user.user_metadata?.["tutorial_seen"] === false;
+  return { id: user.id, email, username, needsTutorialPrompt };
 }
 
 // Supabase's messages are fine as-is except for a couple of common ones.
@@ -33,7 +37,7 @@ export async function signUp(email: string, password: string, username: string):
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { username } },
+    options: { data: { username, tutorial_seen: false } },
   });
   if (error) throw new Error(friendly(error.message));
   // With confirmation on, signing up an already-registered email "succeeds"
@@ -49,5 +53,12 @@ export async function logIn(email: string, password: string): Promise<void> {
 
 export async function logOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
+  if (error) throw new Error(error.message);
+}
+
+// Called once the player has answered the new-account tutorial prompt, so it
+// isn't shown again (on any device).
+export async function markTutorialSeen(): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ data: { tutorial_seen: true } });
   if (error) throw new Error(error.message);
 }
