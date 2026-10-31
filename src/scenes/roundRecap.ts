@@ -77,7 +77,7 @@ export interface RoundRecapRun extends RecapRun {
   skipping: boolean;
 }
 
-// Scenes that can host a recap: BattleScene (and its OnlineBattleScene
+// Scenes that can host a recap: BattleScene (and its RandomBattleScene
 // subclass) stash the active run on themselves for speed/skip control.
 export type RecapCapableScene = Phaser.Scene & { recapRun: RoundRecapRun | null };
 

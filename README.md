@@ -89,7 +89,7 @@ balance — see the open questions in `docs/DESIGN.md`.
 nothing about rendering — no DOM, no Phaser. Rendering is split in two:
 `src/app/` + `src/components/` + `src/hooks/` is the React shell (class select, lobby, card gallery,
 dialogs), while `src/scenes/*` is the Phaser battle stage mounted by `<PhaserBattle>` /
-`<PhaserOnlineBattle>` into a div. The shell and the canvas talk through one narrow bridge —
+`<PhaserRandomBattle>` into a div. The shell and the canvas talk through one narrow bridge —
 scene data in (`playerClass`, `match`/`hand`), an `onExit` callback out — so React never touches
 HP/cards/rounds and Phaser never touches routing. `src/phaserIcons.ts` bridges the hand-authored
 SVG strings from `src/icons.ts` into Phaser textures (base64 data URI → `this.load.svg`), so the
@@ -297,13 +297,13 @@ includes in the public match state — so online matches need the `game` functio
 | `src/components/ClassSelect.tsx` | Class-select screen (was `ClassSelectScene`) |
 | `src/components/Gallery.tsx` | Card gallery (was `CardGalleryScene`) |
 | `src/components/Lobby.tsx` | Online: create/join a room, wait for the opponent (was `LobbyScene`) |
-| `src/components/Dialog.tsx` | Join-code / confirm popups (React; the canvas-era `src/ui/dialog.ts` still serves `OnlineBattleScene`'s leave confirm) |
+| `src/components/Dialog.tsx` | Join-code / confirm popups (React; the canvas-era `src/ui/dialog.ts` still serves `RandomBattleScene`'s leave confirm) |
 | `src/components/PhaserBattle.tsx` | vs-CPU battle mount: creates a scoped `Phaser.Game`, starts `BattleScene`, destroys on unmount |
-| `src/components/PhaserOnlineBattle.tsx` | Online battle mount — same, for `OnlineBattleScene` |
+| `src/components/PhaserRandomBattle.tsx` | Online battle mount (random match and private rooms) — same, for `RandomBattleScene` |
 | `src/components/phaserGame.ts` | Shared `createPhaserGame()` helper (HiDPI text patch, FIT scaling) |
 | `src/hooks/useCatalog.ts` | Catalog load with Supabase → local fallback (was inline in old `main.js`) |
 | `src/scenes/BattleScene.ts` | Battle stage: renders the model's battle state, turns clicks into `playRound()` calls; `onExit` returns to the React menu |
-| `src/scenes/OnlineBattleScene.ts` | Online battle stage — `BattleScene`'s drawing, fed by the server instead of a local engine |
+| `src/scenes/RandomBattleScene.ts` | Online battle stage — `BattleScene`'s drawing, fed by the Colyseus server (`server/BattleRoom.ts`) instead of a local engine |
 | `src/online/matchApi.ts` | Supabase client for online PvP (see "Online PvP" above) |
 | `supabase/` | Supabase config, database migrations, and the `game` Edge Function |
 | `src/scenes/roundRecap.ts` | End-of-round animation + sound effects (see "Round recap" above) |
@@ -343,8 +343,10 @@ includes in the public match state — so online matches need the `game` functio
 
 ## Known simplifications (see docs/DESIGN.md for the full list)
 
-- Online PvP has no matchmaking, reconnect-after-closing-the-tab, or turn timer: a room is
-  joined by code, and a player who never picks a card stalls the match until they press Leave.
+- Every match (vs-CPU, random, private room) has a 30-second turn timer; online matches hold a
+  dropped player's seat for 30 seconds. Both online modes run on the Colyseus server
+  (`server/BattleRoom.ts`); a private room is a private Colyseus room whose id is the room code.
+  The older `game` Edge Function is no longer used by the browser.
 - No fog of war / troop placement.
 - A defend card fully replaces an earlier one of the same damage type rather than stacking
   amounts, even when marked stackable.
@@ -352,7 +354,6 @@ includes in the public match state — so online matches need the `game` functio
 
 ## Ideas for next steps
 
-- Online PvP: turn timer, matchmaking, rejoining a match after closing the tab
 - Fog of war
 - More classes/synergies/cards with real (not placeholder) names and balance
 - Real stacking for stackable defend cards

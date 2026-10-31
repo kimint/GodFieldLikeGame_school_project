@@ -1,9 +1,10 @@
-// Random-match battle screen. Draws exactly like the vs-CPU BattleScene; the
+// Online battle screen (random match and private rooms). Draws exactly like the vs-CPU BattleScene; the
 // battle comes from the Colyseus server (src/online/randomMatch.ts), which
 // resolves the round once both players have picked.
 
-import { BattleScene, type BattleSceneData } from "./BattleScene.ts";
-import { isBattleOver, passAction, type Action } from "../model/engine.ts";
+import { BattleScene, type BattleSceneData, type ResultAction } from "./BattleScene.ts";
+import { COLORS, type Button } from "./theme.ts";
+import { isBattleOver, type Action } from "../model/engine.ts";
 import { deserializeFighter } from "../model/serialize.ts";
 import type { BattleView } from "../online/matchApi.ts";
 import type { RandomMatch, RandomMatchView } from "../online/randomMatch.ts";
@@ -36,9 +37,14 @@ export class RandomBattleScene extends BattleScene {
   pendingPick: string | null = null;
   errorMessage: string | null = null;
   opponentGone = false;
-  autoEnded = false; // already sent this round's turn when the timer ran out
   // What was planned when we locked in, to hand back if the server rejects it.
   planned: Pick<RandomBattleScene, "staged" | "stagedUltimate" | "stagedTargets" | "orders"> | null = null;
+  // Rematch (after the battle): whether the result screen shows Rematch /
+  // Leave, whether we pressed Rematch, and when we go back to the lobby.
+  rematchOffered = false;
+  rematchSent = false;
+  exitAt: number | null = null;
+  leaving = false;
 
   constructor() {
     super("RandomBattleScene");
@@ -51,6 +57,10 @@ export class RandomBattleScene extends BattleScene {
     this.errorMessage = null;
     this.opponentGone = false;
     this.autoEnded = false;
+    this.rematchOffered = false;
+    this.rematchSent = false;
+    this.exitAt = null;
+    this.leaving = false;
 
     const unsubscribe = [
       match.onView((view) => this.applyView(view)),
@@ -69,17 +79,22 @@ export class RandomBattleScene extends BattleScene {
         if (!isBattleOver(this.battle)) {
           this.errorMessage = "Lost connection to the match.";
           this.render();
+        } else if (this.rematchOffered && !match.rematchEnded && this.exitAt === null) {
+          this.exitAt = Date.now(); // closed during the rematch window without a reason: just go back
         }
       }),
       match.onConnectionChange(() => this.render()),
+      // Both pressed Rematch: start this screen over with the new battle.
+      match.onNewGame(() => this.scene.restart({ match, onExit: this.onExit })),
+      match.onRematchEnded((reason) => {
+        const now = Date.now();
+        if (reason === "opponentLeft") this.exitAt = now + 5000;
+        else this.exitAt = match.latest?.myRematch || this.rematchSent ? now + 3000 : now;
+        this.onTurnTick();
+      }),
     ];
-    // Countdown tick. A plain interval, not this.time: the recap speed
-    // setting scales Phaser's clock.
-    const tick = window.setInterval(() => this.onTick(), 250);
-    this.events.once("shutdown", () => {
-      window.clearInterval(tick);
-      unsubscribe.forEach((off) => off());
-    });
+    // The countdown itself ticks in BattleScene (onTurnTick).
+    this.events.once("shutdown", () => unsubscribe.forEach((off) => off()));
     return toBattleView(match.latest!);
   }
 
@@ -101,24 +116,69 @@ export class RandomBattleScene extends BattleScene {
     return super.canAct() && !this.battle.myReady && !this.pendingPick && !this.match.closed && !this.match.reconnecting;
   }
 
-  // Whole seconds left until the local deadline, or null.
-  private secondsLeft(deadline: number | null): number | null {
-    return deadline === null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  // Follow the server's clock: refresh the countdowns, and end the turn for
+  // the player when time runs out.
+  override onTurnTick(): void {
+    if (!this.statusText?.active) return;
+    if (isBattleOver(this.battle)) return this.onResultTick();
+    this.turnDeadline = this.match.turnDeadline;
+    if (this.autoEndTurnIfTimeUp()) return;
+    this.statusText.setText(this.statusMessage());
   }
 
-  // Runs 4x a second: refresh the countdowns, and end the turn for the
-  // player when time runs out (with whatever they had planned, if it can
-  // still be paid for; otherwise a pass).
-  private onTick(): void {
-    if (!this.statusText?.active || isBattleOver(this.battle)) return;
-    const left = this.match.turnDeadline === null ? null : this.match.turnDeadline - Date.now();
-    if (left !== null && left <= 0 && !this.autoEnded && this.canAct()) {
-      this.autoEnded = true;
-      this.handHint = null;
-      this.onEndTurnClick();
-      if (!this.pendingPick) this.commitAction(passAction()); // plan couldn't be paid for
+  // --- rematch --------------------------------------------------------------
+
+  // Rematch / Leave while the server's rematch window is open; otherwise
+  // (say, the opponent forfeited mid-battle) the usual buttons.
+  override resultActions(): ResultAction[] {
+    this.rematchOffered = this.match.rematchDeadline !== null && !this.match.rematchEnded;
+    if (!this.rematchOffered) return super.resultActions();
+    return [
+      { label: "Rematch", color: COLORS.ultimate, hoverColor: COLORS.ultimateHover, onClick: () => this.requestRematch() },
+      { label: "Leave", color: COLORS.restart, hoverColor: COLORS.restartHover, onClick: () => void this.onLeave() },
+    ];
+  }
+
+  private requestRematch(): void {
+    if (this.rematchSent || this.exitAt !== null) return;
+    this.rematchSent = true;
+    this.match.rematch();
+    this.onResultTick();
+  }
+
+  // The line under the result screen's buttons (and the status line).
+  private rematchNote(): string {
+    const view = this.match.latest;
+    if (this.exitAt !== null) {
+      if (this.match.rematchEnded === "opponentLeft") {
+        return `Your opponent left. Returning to the lobby in ${this.secondsLeft(this.exitAt)}s…`;
+      }
+      return this.match.rematchEnded === "timeout" ? "Your opponent didn't accept the rematch. Returning to the lobby…" : "";
+    }
+    if (!this.rematchOffered) return "";
+    if (view?.myRematch || this.rematchSent) return "Rematch requested. Waiting for your opponent…";
+    if (view?.opponentRematch) return "Your opponent wants a rematch!";
+    return "";
+  }
+
+  // Runs 4x a second once the battle is over: the Leave countdown, the
+  // rematch note, and the trip back to the lobby.
+  private onResultTick(): void {
+    if (this.exitAt !== null && Date.now() >= this.exitAt) {
+      this.exitAt = null;
+      void this.onLeave();
       return;
     }
+    if (this.rematchOffered && this.resultLayer) {
+      const [rematchButton, leaveButton] = this.resultButtons;
+      const waiting = this.rematchSent || this.match.latest?.myRematch === true;
+      const open = this.exitAt === null && this.match.rematchDeadline !== null;
+      rematchButton?.setEnabled(open && !waiting);
+      setButtonLabel(rematchButton, waiting && open ? "Waiting…" : "Rematch");
+      const left = open ? this.secondsLeft(this.match.rematchDeadline) : null;
+      setButtonLabel(leaveButton, left === null ? "Leave" : `Leave (${left}s)`);
+    }
+    this.resultNote?.setText(this.rematchNote());
     this.statusText.setText(this.statusMessage());
   }
 
@@ -134,6 +194,7 @@ export class RandomBattleScene extends BattleScene {
   }
 
   override async onLeave(): Promise<void> {
+    if (this.leaving) return;
     if (!isBattleOver(this.battle) && !this.match.closed) {
       const leave = await confirmDialog({
         title: "Leave this match?",
@@ -143,6 +204,7 @@ export class RandomBattleScene extends BattleScene {
       });
       if (!leave || !this.sys.isActive()) return;
     }
+    this.leaving = true;
     this.match.leave();
     if (this.onExit) {
       this.onExit();
@@ -153,8 +215,9 @@ export class RandomBattleScene extends BattleScene {
 
   override statusMessage(): string {
     const b = this.battle;
-    if (b.draw) return `Draw! ${this.leaveHint}`;
-    if (b.winner) return `${b.winner === b.player ? "You win!" : "Your opponent wins."} ${this.leaveHint}`;
+    const after = this.rematchNote() || this.leaveHint;
+    if (b.draw) return `Draw! ${after}`;
+    if (b.winner) return `${b.winner === b.player ? "You win!" : "Your opponent wins."} ${after}`;
     if (this.match.reconnecting) return `Round ${b.round} — Connection lost. Reconnecting…`;
     const opponentLeft = this.secondsLeft(this.match.opponentDeadline);
     if (opponentLeft !== null) return `Round ${b.round} — Your opponent disconnected. They have ${opponentLeft}s to come back.`;
@@ -190,4 +253,10 @@ export class RandomBattleScene extends BattleScene {
     if (justResolved) this.presentRound(before);
     else this.render();
   }
+}
+
+// createButton() puts the label text second in its container.
+function setButtonLabel(button: Button | undefined, text: string): void {
+  const label = button?.container.getAt(1) as Phaser.GameObjects.Text | undefined;
+  if (label && label.text !== text) label.setText(text);
 }

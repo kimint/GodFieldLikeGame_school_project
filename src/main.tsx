@@ -1,6 +1,6 @@
 // React-shell bootstrap (replaces the Phaser-only main.js boot for index.html).
 // The game rules still live in src/model/*; battle frames still live in
-// src/scenes/* (mounted by PhaserBattle / PhaserOnlineBattle). This file only
+// src/scenes/* (mounted by PhaserBattle / PhaserRandomBattle). This file only
 // mounts the React menus/popups shell.
 //
 // NOTE: no React StrictMode here on purpose -- its dev double-effect would

@@ -1,24 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import type { ClassDef } from "../model/classes.ts";
-import type { Card } from "../model/cardTypes.ts";
-import {
-  createMatch,
-  ensureSignedIn,
-  fetchHand,
-  fetchMatch,
-  fetchMatchVersion,
-  joinMatch,
-  leaveMatch,
-  watchMatch,
-  type MatchRow,
-} from "../online/matchApi.ts";
-
-export interface LobbyReady {
-  matchId: string;
-  userId: string;
-  match: MatchRow;
-  hand: Card[];
-}
+import { createPrivateMatch, joinPrivateMatch, type RandomMatch } from "../online/randomMatch.ts";
 
 export interface LobbyProps {
   mode: "create" | "join";
@@ -28,80 +10,61 @@ export interface LobbyProps {
   deckName: string;
   /** For join mode: the room code supplied up front (from the join dialog). */
   code?: string;
-  onReady: (ready: LobbyReady) => void;
+  onReady: (match: RandomMatch) => void;
   onBack: () => void;
 }
 
-/** Online lobby (React shell): create a room / join by code, wait for start. */
+/**
+ * Private-room lobby (React shell): create a room / join by code, wait for
+ * start. The room lives on the Colyseus server, same as a random match, so
+ * it gets the same turn timer and 30s reconnection.
+ */
 export function Lobby({ mode, playerClass, deckId, deckName, code, onReady, onBack }: LobbyProps): ReactElement {
   const [status, setStatus] = useState("Connecting…");
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const stateRef = useRef({ matchId: null as string | null, userId: null as string | null, starting: false, stopWatching: null as (() => void) | null, gone: false });
+  const matchRef = useRef<RandomMatch | null>(null);
+  const startedRef = useRef(false);
 
   useEffect(() => {
-    const s = stateRef.current;
     let cancelled = false;
+    let offView: (() => void) | null = null;
 
-    async function checkStarted(): Promise<void> {
-      if (s.starting || s.gone || !s.matchId) return;
-      let version;
-      try {
-        version = await fetchMatchVersion(s.matchId);
-      } catch {
-        return; // try again on the next event/poll
-      }
-      if (s.starting || s.gone || cancelled) return;
-      if (version.round === 0) {
-        if (version.status === "finished") {
-          setStatus("This room was closed.");
-          s.stopWatching?.();
+    const connect =
+      mode === "create" ? createPrivateMatch(playerClass.id, deckId) : joinPrivateMatch(code ?? "", playerClass.id, deckId);
+    connect.then(
+      (match) => {
+        if (cancelled) {
+          match.leave();
+          return;
         }
-        return;
-      }
-      s.starting = true;
-      try {
-        const [match, hand] = await Promise.all([fetchMatch(s.matchId), fetchHand(s.matchId, s.userId!)]);
-        if (s.gone || cancelled) return;
-        s.stopWatching?.();
-        onReady({ matchId: s.matchId, userId: s.userId!, match, hand });
-      } catch {
-        s.starting = false; // try again on the next event/poll
-      }
-    }
-
-    async function run(): Promise<void> {
-      try {
-        setStatus("Connecting…");
-        const userId = await ensureSignedIn();
+        matchRef.current = match;
+        // The first "state" message means both players are in.
+        const start = (): void => {
+          if (startedRef.current) return;
+          startedRef.current = true;
+          offView?.();
+          onReady(match);
+        };
+        if (match.latest) start();
+        else {
+          if (mode === "create") {
+            setRoomCode(match.code);
+            setStatus("Send this room code to a friend. Waiting for them to join… (click the code to copy it)");
+          } else setStatus("Joined! Starting the battle…");
+          offView = match.onView(start);
+        }
+      },
+      (err: Error) => {
         if (cancelled) return;
-        s.userId = userId;
-        if (mode === "create") {
-          const match = await createMatch(playerClass.id, deckId);
-          if (cancelled) return;
-          s.matchId = match.id;
-          setRoomCode(match.code);
-          setStatus("Send this room code to a friend. Waiting for them to join… (click the code to copy it)");
-        } else {
-          const match = await joinMatch(code ?? "", playerClass.id, deckId);
-          if (cancelled) return;
-          s.matchId = match.id;
-          setStatus("Joined! Starting the battle…");
-        }
-        s.stopWatching = watchMatch(s.matchId, () => void checkStarted());
-      } catch (err) {
-        if (!cancelled) {
-          setStatus((err as Error).message);
-          setFailed(true);
-        }
+        setStatus(err.message || "Couldn't reach the match server.");
+        setFailed(true);
       }
-    }
-    void run();
+    );
 
     return () => {
       cancelled = true;
-      s.gone = true;
-      s.stopWatching?.();
+      offView?.();
     };
   }, []);
 
@@ -114,11 +77,8 @@ export function Lobby({ mode, playerClass, deckId, deckName, code, onReady, onBa
   };
 
   const back = (): void => {
-    const s = stateRef.current;
     // Close our room if nobody has joined yet, so it doesn't sit there open.
-    if (s.matchId && !s.starting) leaveMatch(s.matchId).catch(() => {});
-    s.gone = true;
-    s.stopWatching?.();
+    if (!startedRef.current) matchRef.current?.leave();
     onBack();
   };
 

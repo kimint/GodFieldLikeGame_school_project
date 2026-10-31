@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { useCatalog } from "../hooks/useCatalog.ts";
 import { useAuth } from "../hooks/useAuth.ts";
 import { AuthScreen } from "../components/AuthScreen.tsx";
@@ -6,10 +6,10 @@ import { ClassSelect } from "../components/ClassSelect.tsx";
 import { DeckBuilder } from "../components/DeckBuilder.tsx";
 import { Gallery } from "../components/Gallery.tsx";
 import { MatchHistory } from "../components/MatchHistory.tsx";
-import { Lobby, type LobbyReady } from "../components/Lobby.tsx";
+import { PhaserTutorial } from "../components/PhaserTutorial.tsx";
+import { Lobby } from "../components/Lobby.tsx";
 import { Dialog, type DialogProps } from "../components/Dialog.tsx";
 import { PhaserBattle } from "../components/PhaserBattle.tsx";
-import { PhaserOnlineBattle } from "../components/PhaserOnlineBattle.tsx";
 import { RandomLobby } from "../components/RandomLobby.tsx";
 import { PhaserRandomBattle } from "../components/PhaserRandomBattle.tsx";
 import type { RandomMatch } from "../online/randomMatch.ts";
@@ -17,7 +17,7 @@ import { findClassById } from "../model/catalog.ts";
 import { validateDeckList, type DeckListEntry } from "../model/decks.ts";
 import type { ClassDef } from "../model/classes.ts";
 import { onlineAvailable } from "../online/supabaseClient.ts";
-import { logOut } from "../online/authApi.ts";
+import { logOut, markTutorialSeen } from "../online/authApi.ts";
 import { listDecks, type SavedDeck } from "../online/decksApi.ts";
 import { fetchMatchHistory, type MatchHistoryData } from "../online/historyApi.ts";
 
@@ -33,11 +33,11 @@ type Screen =
   | { name: "menu" }
   | { name: "gallery" }
   | { name: "record" }
+  | { name: "tutorial" }
   | { name: "decks"; classId: string }
   | { name: "battle"; playerClassId: string; deck: DeckChoice }
   | { name: "lobby-create"; playerClass: ClassDef; deck: DeckChoice }
   | { name: "lobby-join"; playerClass: ClassDef; deck: DeckChoice; code: string }
-  | { name: "online-battle"; ready: LobbyReady }
   | { name: "lobby-random"; playerClass: ClassDef; deck: DeckChoice }
   | { name: "random-battle"; match: RandomMatch };
 
@@ -55,6 +55,10 @@ export function App(): ReactElement {
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   const accountId = auth.account?.id ?? null;
+  const needsTutorialPrompt = auth.account?.needsTutorialPrompt ?? false;
+  // Accounts already asked this session, so the prompt doesn't come back while
+  // the "tutorial seen" flag is still saving.
+  const tutorialAsked = useRef(new Set<string>());
 
   const reloadDecks = useCallback(async (): Promise<void> => {
     if (!accountId) return;
@@ -89,6 +93,27 @@ export function App(): ReactElement {
     void reloadDecks();
     void reloadHistory();
   }, [accountId, reloadDecks, reloadHistory]);
+
+  // A brand-new account: offer the tutorial once. Either answer is saved to
+  // the account, so it isn't asked again.
+  useEffect(() => {
+    if (!accountId || !needsTutorialPrompt || tutorialAsked.current.has(accountId)) return;
+    tutorialAsked.current.add(accountId);
+    const answer = (start: boolean): void => {
+      setDialog(null);
+      if (start) setScreen({ name: "tutorial" });
+      markTutorialSeen().catch((err: Error) => console.warn("Couldn't save the tutorial prompt answer:", err.message));
+    };
+    setDialog({
+      kind: "confirm",
+      title: `Welcome, ${auth.account?.username ?? "Player"}!`,
+      message: "New to Godfield-lite? The tutorial is a guided practice match that shows you how everything works, step by step. You can also open it later from the home screen.",
+      confirmLabel: "Start tutorial",
+      cancelLabel: "Skip",
+      onConfirm: () => answer(true),
+      onCancel: () => answer(false),
+    });
+  }, [accountId, needsTutorialPrompt, auth.account?.username]);
 
   if (!catalog.ready || !auth.ready) {
     return (
@@ -177,6 +202,9 @@ export function App(): ReactElement {
     case "gallery":
       body = <Gallery onBack={toMenu} />;
       break;
+    case "tutorial":
+      body = <PhaserTutorial onExit={toMenu} />;
+      break;
     case "record":
       body = (
         <MatchHistory
@@ -214,7 +242,7 @@ export function App(): ReactElement {
           playerClass={screen.playerClass}
           deckId={screen.deck.id}
           deckName={screen.deck.name}
-          onReady={(ready) => setScreen({ name: "online-battle", ready })}
+          onReady={(match) => setScreen({ name: "random-battle", match })}
           onBack={toMenu}
         />
       );
@@ -227,19 +255,8 @@ export function App(): ReactElement {
           deckId={screen.deck.id}
           deckName={screen.deck.name}
           code={screen.code}
-          onReady={(ready) => setScreen({ name: "online-battle", ready })}
+          onReady={(match) => setScreen({ name: "random-battle", match })}
           onBack={toMenu}
-        />
-      );
-      break;
-    case "online-battle":
-      body = (
-        <PhaserOnlineBattle
-          matchId={screen.ready.matchId}
-          userId={screen.ready.userId}
-          match={screen.ready.match}
-          hand={screen.ready.hand}
-          onExit={toMenuAfterOnlineGame}
         />
       );
       break;
@@ -287,6 +304,7 @@ export function App(): ReactElement {
           }
           onOpenGallery={() => setScreen({ name: "gallery" })}
           onOpenRecord={() => setScreen({ name: "record" })}
+          onOpenTutorial={() => setScreen({ name: "tutorial" })}
         />
       );
       break;

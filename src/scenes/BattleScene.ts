@@ -21,6 +21,7 @@ import {
   orderCost,
   targetProblem,
   describeAbility,
+  passAction,
   playRound,
   describeEffect,
   isBattleOver,
@@ -343,10 +344,34 @@ function ultimateName(classDef: ClassDef): string {
   return name && name !== "TBD" ? name : "Ultimate";
 }
 
+// Board geometry for subclasses that point at parts of the board (the
+// tutorial's coach highlights).
+export const LAYOUT = {
+  cpuStrip: { x: STRIP_X, y: CPU_STRIP_Y, w: STRIP_W, h: STRIP_H },
+  playerStrip: { x: PLAYER_STRIP_X, y: PLAYER_STRIP_Y, w: PLAYER_STRIP_W, h: STRIP_H },
+  cpuPortrait: { x: PORTRAIT_X, y: CPU_PORTRAIT_Y, w: PORTRAIT_W, h: PORTRAIT_H },
+  playerSlot: { x: GAME_WIDTH / 2 + SLOT_TOTAL_W / 2 - SLOT_W, y: SLOT_Y, w: SLOT_W, h: SLOT_H },
+  classBadge: CLASS_BADGE,
+  endTurn: { x: END_TURN.x, y: END_TURN.y, r: END_TURN_RING_R + END_TURN_RING_W },
+  handY: HAND_Y,
+  card: { w: CARD_W, h: CARD_H },
+  monster: { w: MONSTER_W, h: MONSTER_H },
+  logBox: LOG_BOX,
+  logHideDx: LOG_HIDE_DX,
+} as const;
+
 export interface BattleSceneData {
   playerClass: ClassDef;
   playerDeck?: Card[] | null; // a custom deck (decks.ts); null/absent = starter deck
   onExit?: (() => void) | null;
+}
+
+// One button on the end-of-game screen.
+export interface ResultAction {
+  label: string;
+  color: number;
+  hoverColor: number;
+  onClick: () => void;
 }
 
 export interface HpPair {
@@ -354,7 +379,10 @@ export interface HpPair {
   cpu: number;
 }
 
-// vs-CPU battle. OnlineBattleScene (src/scenes/OnlineBattleScene.ts) reuses
+// Seconds per turn: the same as online play (server/BattleRoom.ts TURN_SECONDS).
+export const TURN_SECONDS = 30;
+
+// vs-CPU battle. RandomBattleScene (src/scenes/RandomBattleScene.ts) reuses
 // all of the drawing below and only overrides the hooks in the "battle
 // source" section: where the battle comes from, what a click does, and the
 // status line.
@@ -371,6 +399,8 @@ export class BattleScene extends Phaser.Scene {
   settingsMenu: Phaser.GameObjects.Container | null = null; // the settings dropdown, while open
   speedButton!: Button; // replay speed; its label follows the settings menu's speed slider
   resultDismissed = false; // closed with "View board"
+  resultButtons: Button[] = []; // the end-of-game screen's buttons, in resultActions() order
+  resultNote: Phaser.GameObjects.Text | null = null; // a line under them, for subclasses (rematch)
   cpuPanel!: Phaser.GameObjects.Container;
   playerPanel!: Phaser.GameObjects.Container;
   cpuPortrait!: Phaser.GameObjects.Container;
@@ -403,6 +433,10 @@ export class BattleScene extends Phaser.Scene {
   logHidden = false;
   logScrollTrack!: Phaser.GameObjects.Rectangle;
   logScrollThumb!: Phaser.GameObjects.Rectangle;
+  // Turn timer. vs-CPU runs its own clock; online scenes copy the server's.
+  turnDeadline: number | null = null; // local-clock ms when this turn's time runs out
+  turnTimerRound = 0; // the round the vs-CPU clock was started for
+  autoEnded = false; // already ended this round's turn because time ran out
 
   constructor(key = "BattleScene") {
     super(key);
@@ -445,7 +479,7 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // --- battle source (overridden by OnlineBattleScene) ---------------------
+  // --- battle source (overridden by RandomBattleScene) ---------------------
 
   setupBattle(data: BattleSceneData): Battle {
     const playerClass = data.playerClass;
@@ -479,12 +513,20 @@ export class BattleScene extends Phaser.Scene {
     return `${this.opponentLabel} (${opponent}) wins in round ${b.round}.`;
   }
 
+  // The end-of-game screen's buttons. Online scenes swap in Rematch / Leave.
+  resultActions(): ResultAction[] {
+    return [
+      { label: "Back to menu", color: COLORS.ultimate, hoverColor: COLORS.ultimateHover, onClick: () => void this.onLeave() },
+      { label: "View board", color: COLORS.restart, hoverColor: COLORS.restartHover, onClick: () => this.hideResult() },
+    ];
+  }
+
   // Whether the hand/ultimate should take clicks right now.
   canAct(): boolean {
     return !isBattleOver(this.battle) && !this.recapPlaying;
   }
 
-  // Send this turn. vs-CPU resolves it right away; OnlineBattleScene
+  // Send this turn. vs-CPU resolves it right away; RandomBattleScene
   // overrides this to send it to the server.
   commitAction(action: Action): void {
     this.clearPlanning();
@@ -534,8 +576,44 @@ export class BattleScene extends Phaser.Scene {
   statusMessage(): string {
     if (this.battle.winner) return `${fighterName(this.battle.winner)} wins! ${this.leaveHint}`;
     if (this.battle.draw) return `Draw! ${this.leaveHint}`;
-    if (this.handHint) return `Round ${this.battle.round} — ${this.handHint}`;
-    return `Round ${this.battle.round} — ${this.plannedAp()}/${this.battle.player.maxAp} AP left. Play cards or click your monsters to give orders, then End turn.`;
+    const turnLeft = this.canAct() ? this.secondsLeft(this.turnDeadline) : null;
+    if (this.handHint) return `Round ${this.battle.round} — ${this.handHint}${turnLeft === null ? "" : ` (${turnLeft}s)`}`;
+    return `Round ${this.battle.round} — ${turnLeft === null ? "" : `${turnLeft}s · `}${this.plannedAp()}/${this.battle.player.maxAp} AP left. Play cards or click your monsters to give orders, then End turn.`;
+  }
+
+  // --- turn timer ----------------------------------------------------------
+
+  // Whole seconds left until a local-clock deadline, or null.
+  secondsLeft(deadline: number | null): number | null {
+    return deadline === null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  }
+
+  // Runs 4x a second. vs-CPU: start the clock once the player can act (after
+  // the recap), end the turn when it runs out, refresh the countdown.
+  // Online scenes override this to follow the server's clock instead.
+  onTurnTick(): void {
+    if (!this.statusText?.active || isBattleOver(this.battle)) return;
+    if (this.canAct() && this.turnTimerRound !== this.battle.round) {
+      this.turnTimerRound = this.battle.round;
+      this.turnDeadline = Date.now() + TURN_SECONDS * 1000;
+      this.autoEnded = false;
+    }
+    if (this.autoEndTurnIfTimeUp()) return;
+    this.statusText.setText(this.statusMessage());
+  }
+
+  // Time's up: end the turn with whatever was planned, if it can still be
+  // paid for; otherwise pass. Returns whether it did.
+  autoEndTurnIfTimeUp(): boolean {
+    if (this.turnDeadline === null || Date.now() < this.turnDeadline || this.autoEnded || !this.canAct()) return false;
+    this.autoEnded = true;
+    this.handHint = null;
+    this.previewedCardId = null;
+    this.targeting = null;
+    this.monsterMenuUid = null;
+    this.onEndTurnClick();
+    if (this.canAct()) this.commitAction(passAction()); // plan couldn't be paid for
+    return true;
   }
 
   // --- scene ---------------------------------------------------------------
@@ -551,9 +629,18 @@ export class BattleScene extends Phaser.Scene {
     this.recapSpeed = readRecapSpeed();
     this.resultLayer = null; // the end-of-game screen, once shown
     this.resultDismissed = false; // closed with "View board"
+    this.resultButtons = [];
+    this.resultNote = null;
+    this.turnDeadline = null;
+    this.turnTimerRound = 0;
+    this.autoEnded = false;
     this.battle = this.setupBattle(data);
 
+    // Turn-timer tick. A plain interval, not this.time: the recap speed
+    // setting scales Phaser's clock.
+    const tick = window.setInterval(() => this.onTurnTick(), 250);
     this.events.once("shutdown", () => {
+      window.clearInterval(tick);
       this.tweens.timeScale = 1;
       this.time.timeScale = 1;
     });
@@ -1019,20 +1106,31 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     layer.add([title, subtitle, summary]);
 
-    const primary = createButton(this, cx - 170, cy + 150, 160, 44, "Back to menu", {
-      color: COLORS.ultimate,
-      hoverColor: COLORS.ultimateHover,
-      onClick: () => this.onLeave(),
-    });
-    const secondary = createButton(this, cx + 10, cy + 150, 160, 44, "View board", {
-      color: COLORS.restart,
-      hoverColor: COLORS.restartHover,
-      onClick: () => this.hideResult(),
-    });
-    layer.add([primary.container, secondary.container]);
+    // The buttons, centered side by side.
+    const actions = this.resultActions();
+    const buttonW = 160;
+    const gap = 20;
+    const left = cx - (actions.length * buttonW + (actions.length - 1) * gap) / 2;
+    this.resultButtons = actions.map((a, i) =>
+      createButton(this, left + i * (buttonW + gap), cy + 150, buttonW, 44, a.label, {
+        color: a.color,
+        hoverColor: a.hoverColor,
+        onClick: a.onClick,
+      })
+    );
+    const note = this.add
+      .text(cx, cy + 210, "", { fontFamily: FONT_FAMILY, fontSize: "16px", fontStyle: "700", color: TEXT.white, align: "center" })
+      .setOrigin(0.5, 0);
+    this.resultNote = note;
+    layer.add([...this.resultButtons.map((b) => b.container), note]);
 
     // Entrance: a stamp for VICTORY, a heavy drop for DEFEAT, a fade for DRAW.
-    const details: Array<Phaser.GameObjects.Container | Phaser.GameObjects.Text> = [subtitle, summary, primary.container, secondary.container];
+    const details: Array<Phaser.GameObjects.Container | Phaser.GameObjects.Text> = [
+      subtitle,
+      summary,
+      ...this.resultButtons.map((b) => b.container),
+      note,
+    ];
     details.forEach((o) => o.setAlpha(0));
     dim.setAlpha(0);
     this.tweens.add({ targets: dim, alpha: 1, duration: 250 });
