@@ -5,7 +5,7 @@
 // loader, which rasterizes it into a texture at load time.
 
 import type Phaser from "phaser";
-import { cardIconMarkup, classIconMarkup, ultimateIconMarkup, DAMAGE_TYPE_ACCENT, ELEMENT_ACCENT } from "./icons.ts";
+import { cardIconMarkup, classIconMarkup, settingsIconMarkup, ultimateIconMarkup, DAMAGE_TYPE_ACCENT, ELEMENT_ACCENT } from "./icons.ts";
 import { CARD_CATEGORY, type CardCategory } from "./model/cardTypes.ts";
 import type { DamageType, Element } from "./model/damageTypes.ts";
 import type { ClassDef } from "./model/classes.ts";
@@ -23,6 +23,7 @@ export const CARD_ICON_KEY: Record<CardCategory, string> = {
 };
 
 export const ULTIMATE_ICON_KEY = "icon-ultimate";
+export const SETTINGS_ICON_KEY = "icon-settings";
 
 export function classIconKey(classId: string): string {
   return `icon-class-${classId}`;
@@ -45,6 +46,7 @@ export function preloadIcons(scene: Phaser.Scene, classDefs: ClassDef[]): void {
     queueSvg(scene, CARD_ICON_KEY[category], cardIconMarkup({ category }));
   }
   queueSvg(scene, ULTIMATE_ICON_KEY, ultimateIconMarkup());
+  queueSvg(scene, SETTINGS_ICON_KEY, settingsIconMarkup());
   for (const classDef of classDefs) {
     queueSvg(scene, classIconKey(classDef.id), classIconMarkup(classDef));
   }

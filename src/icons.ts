@@ -64,7 +64,7 @@ export function cardIconMarkup(card: { category: CardCategory; damageType?: Dama
   const isTyped = card.category === CARD_CATEGORY.ATTACK || card.category === CARD_CATEGORY.DEFEND;
   const accent = isTyped && card.damageType ? DAMAGE_TYPE_ACCENT[card.damageType] : null;
   const dot = accent
-    ? `<circle cx="19.5" cy="4.5" r="2.6" fill="${accent}" stroke="#1e2230" stroke-width="0.8"/>`
+    ? `<circle cx="19.5" cy="4.5" r="2.6" fill="${accent}" stroke="#1f2023" stroke-width="0.8"/>`
     : "";
   return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}${dot}</svg>`;
 }
@@ -109,11 +109,11 @@ const CLASS_ICON_BODY: Record<string, string> = {
   `,
   // A pale skull -- Necromancer.
   necromancer: `
-    <path d="M12 3 C7 3 4.5 6.5 4.5 10.5 C4.5 13 5.7 14.6 7.5 15.5 V19 H16.5 V15.5 C18.3 14.6 19.5 13 19.5 10.5 C19.5 6.5 17 3 12 3 Z" fill="#e8eaf0"/>
-    <circle cx="9" cy="10.8" r="2" fill="#1e2230"/>
-    <circle cx="15" cy="10.8" r="2" fill="#1e2230"/>
-    <path d="M12 13 L11 15 H13 Z" fill="#1e2230"/>
-    <path d="M10 19 V17.2 M12 19 V17.2 M14 19 V17.2" stroke="#1e2230" stroke-width="0.9"/>
+    <path d="M12 3 C7 3 4.5 6.5 4.5 10.5 C4.5 13 5.7 14.6 7.5 15.5 V19 H16.5 V15.5 C18.3 14.6 19.5 13 19.5 10.5 C19.5 6.5 17 3 12 3 Z" fill="#e9eaec"/>
+    <circle cx="9" cy="10.8" r="2" fill="#1f2023"/>
+    <circle cx="15" cy="10.8" r="2" fill="#1f2023"/>
+    <path d="M12 13 L11 15 H13 Z" fill="#1f2023"/>
+    <path d="M10 19 V17.2 M12 19 V17.2 M14 19 V17.2" stroke="#1f2023" stroke-width="0.9"/>
   `,
 };
 
@@ -141,4 +141,20 @@ const ULTIMATE_ICON_BODY = `
 
 export function ultimateIconMarkup(): string {
   return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${ULTIMATE_ICON_BODY}</svg>`;
+}
+
+// --- settings icon -------------------------------------------------------------
+//
+// One big clip-art gear for the battle screen's settings button: ten chunky
+// teeth, a dark outline, a raised hub ring and a hole through the middle.
+
+const SETTINGS_ICON_BODY = `
+  <path fill-rule="evenodd" fill="#dcdde0" stroke="#1a1b1e" stroke-width="0.8" stroke-linejoin="round"
+        d="M9.47 3.78 L10.71 3.50 L10.95 0.85 L13.05 0.85 L13.29 3.50 L14.53 3.78 L14.79 3.86 L15.95 4.36 L17.70 2.36 L19.41 3.60 L18.04 5.88 L18.88 6.84 L19.04 7.05 L19.69 8.14 L22.28 7.55 L22.93 9.56 L20.49 10.60 L20.60 11.86 L20.60 12.14 L20.49 13.40 L22.93 14.44 L22.28 16.45 L19.69 15.86 L19.04 16.95 L18.88 17.16 L18.04 18.12 L19.41 20.40 L17.70 21.64 L15.95 19.64 L14.79 20.14 L14.53 20.22 L13.29 20.50 L13.05 23.15 L10.95 23.15 L10.71 20.50 L9.47 20.22 L9.21 20.14 L8.05 19.64 L6.30 21.64 L4.59 20.40 L5.96 18.12 L5.12 17.16 L4.96 16.95 L4.31 15.86 L1.72 16.45 L1.07 14.44 L3.51 13.40 L3.40 12.14 L3.40 11.86 L3.51 10.60 L1.07 9.56 L1.72 7.55 L4.31 8.14 L4.96 7.05 L5.12 6.84 L5.96 5.88 L4.59 3.60 L6.30 2.36 L8.05 4.36 L9.21 3.86 Z
+           M12 8.6 a3.4 3.4 0 1 0 0.001 0 Z"/>
+  <circle cx="12" cy="12" r="5.6" fill="none" stroke="#a0a2a8" stroke-width="1.1"/>
+`;
+
+export function settingsIconMarkup(): string {
+  return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${SETTINGS_ICON_BODY}</svg>`;
 }

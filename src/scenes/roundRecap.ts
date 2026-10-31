@@ -229,7 +229,7 @@ function captionFor(run: RoundRecapRun, side: RecapSide, title: string): {
 async function passStep(run: RoundRecapRun, key: Key): Promise<void> {
   const side = run.recap.sides[key];
   const { caption, resultText } = captionFor(run, side, "Pass");
-  resultText.setText("No cards played").setColor(hex(0xa9adc1));
+  resultText.setText("No cards played").setColor(hex(0xa9abb0));
   await tween(run, { targets: caption, alpha: 1, duration: 200 });
   await wait(run, 450);
   await tween(run, { targets: caption, alpha: 0, duration: 150 });
@@ -284,7 +284,7 @@ async function playEffect(
 ): Promise<EffectResult | null> {
   if (action.cancelled) {
     playSfx("block");
-    return { text: action.cancelled === "interrupted" ? "Interrupted!" : "Too late -- knocked out", color: 0xa9adc1 };
+    return { text: action.cancelled === "interrupted" ? "Interrupted!" : "Too late -- knocked out", color: 0xa9abb0 };
   }
 
   if (action.kind === "ultimate") {
