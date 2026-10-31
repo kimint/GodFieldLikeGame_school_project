@@ -91,10 +91,6 @@ export class RandomBattleScene extends BattleScene {
     return "Opponent";
   }
 
-  override get leaveLabel(): string {
-    return "Leave";
-  }
-
   override resultSubtitle(): string {
     const b = this.battle;
     if (b.winner === b.player && b.log[0]?.includes("left the match")) return "Your opponent left the match.";
@@ -157,8 +153,8 @@ export class RandomBattleScene extends BattleScene {
 
   override statusMessage(): string {
     const b = this.battle;
-    if (b.draw) return `Draw! Press "Leave" to go back.`;
-    if (b.winner) return `${b.winner === b.player ? "You win!" : "Your opponent wins."} Press "Leave" to go back.`;
+    if (b.draw) return `Draw! ${this.leaveHint}`;
+    if (b.winner) return `${b.winner === b.player ? "You win!" : "Your opponent wins."} ${this.leaveHint}`;
     if (this.match.reconnecting) return `Round ${b.round} — Connection lost. Reconnecting…`;
     const opponentLeft = this.secondsLeft(this.match.opponentDeadline);
     if (opponentLeft !== null) return `Round ${b.round} — Your opponent disconnected. They have ${opponentLeft}s to come back.`;

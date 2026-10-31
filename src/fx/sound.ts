@@ -2,29 +2,36 @@
 // files to ship. Best-effort: in a browser without Web Audio, or before the
 // page has had a click, they just stay silent.
 //
-// The mute switch is remembered per browser.
+// The volume (0..1, set from the battle screen's settings menu) is
+// remembered per browser. Every sound goes through one master gain node set
+// to it, so a change also applies to sounds already playing.
 
-const MUTE_KEY = "godfield.muted";
+const VOLUME_KEY = "godfield.volume";
+const MUTE_KEY = "godfield.muted"; // the old on/off switch: muted reads as volume 0
 
-let muted: boolean = readMuted();
+let volume: number = readVolume();
 let audioCtx: AudioContext | null = null;
+let master: GainNode | null = null;
 
-function readMuted(): boolean {
+function readVolume(): number {
   try {
-    return window.localStorage.getItem(MUTE_KEY) === "1";
+    const stored = window.localStorage.getItem(VOLUME_KEY);
+    if (stored !== null && Number.isFinite(Number(stored))) return Math.min(1, Math.max(0, Number(stored)));
+    return window.localStorage.getItem(MUTE_KEY) === "1" ? 0 : 1;
   } catch {
-    return false;
+    return 1;
   }
 }
 
-export function isMuted(): boolean {
-  return muted;
+export function getVolume(): number {
+  return volume;
 }
 
-export function setMuted(value: boolean): void {
-  muted = value;
+export function setVolume(value: number): void {
+  volume = Math.min(1, Math.max(0, value));
+  if (master && audioCtx) master.gain.setValueAtTime(volume, audioCtx.currentTime);
   try {
-    window.localStorage.setItem(MUTE_KEY, value ? "1" : "0");
+    window.localStorage.setItem(VOLUME_KEY, String(volume));
   } catch {
     // storage unavailable (private window etc.) -- just don't remember it
   }
@@ -37,6 +44,9 @@ function ctx(): AudioContext | null {
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     audioCtx = new Ctor();
+    master = audioCtx.createGain();
+    master.gain.value = volume;
+    master.connect(audioCtx.destination);
   }
   if (audioCtx.state === "suspended") void audioCtx.resume();
   return audioCtx;
@@ -64,7 +74,7 @@ function tone(ac: AudioContext, { type = "sine", from, to = from, start = 0, dur
   gain.gain.setValueAtTime(0.0001, t0);
   gain.gain.exponentialRampToValueAtTime(volume, t0 + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-  osc.connect(gain).connect(ac.destination);
+  osc.connect(gain).connect(master ?? ac.destination);
   osc.start(t0);
   osc.stop(t0 + duration + 0.05);
 }
@@ -97,7 +107,7 @@ function noise(
   const gain = ac.createGain();
   gain.gain.setValueAtTime(volume, t0);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-  src.connect(biquad).connect(gain).connect(ac.destination);
+  src.connect(biquad).connect(gain).connect(master ?? ac.destination);
   src.start(t0);
 }
 
@@ -169,7 +179,7 @@ const SFX: Record<string, (ac: AudioContext) => void> = {
 export type SfxName = keyof typeof SFX | string;
 
 export function playSfx(name: string): void {
-  if (muted || !SFX[name]) return;
+  if (volume <= 0 || !SFX[name]) return;
   try {
     const ac = ctx();
     if (ac) (SFX[name] as (ac: AudioContext) => void)(ac);

@@ -41,9 +41,9 @@ import type { StatKey } from "../model/stats.ts";
 import { cardCost, type Card, type DefendCard } from "../model/cardTypes.ts";
 import type { ClassDef } from "../model/classes.ts";
 import { allCards, allClasses } from "../model/catalog.ts";
-import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY } from "../phaserIcons.ts";
+import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY, SETTINGS_ICON_KEY } from "../phaserIcons.ts";
 import { loadCardArt, loadedArtKey } from "../cardArt.ts";
-import { isMuted, playSfx, setMuted } from "../fx/sound.ts";
+import { getVolume, playSfx, setVolume } from "../fx/sound.ts";
 import {
   COLORS,
   TEXT,
@@ -86,12 +86,6 @@ const PORTRAIT_H = 200;
 const CPU_PORTRAIT_Y = 44;
 const PLAYER_STRIP_X = PORTRAIT_X;
 const PLAYER_STRIP_W = STRIP_X + STRIP_W - PLAYER_STRIP_X;
-
-// Left-column buttons, between the portraits.
-const BUTTON_X = 24;
-const BUTTON_W = 176;
-const BUTTON_H = 40;
-const LEAVE_BUTTON_Y = 296;
 
 const HAND_Y = 548;
 const CARD_W = 112;
@@ -224,7 +218,7 @@ const CHIP_COLOR = {
   guard: 0x2f6f8f,
   up: 0x3a8f5a,
   down: 0x8a3a52,
-  synergy: 0x4a5573,
+  synergy: 0x484b51,
   synergyActive: 0xa8842f,
 };
 
@@ -238,8 +232,16 @@ const TORCHES = [
 ];
 const TORCH_GLOW_KEY = "torch-glow";
 
-// Round-recap playback speeds the Speed button cycles through; the choice is
-// remembered per browser.
+// Top-left settings gear, and the menu that drops down from it: a tab behind
+// the gear that widens into a panel with volume, account and replay speed.
+// The tab and the panel's left edge line up with the gear's left edge.
+const SETTINGS = { x: 40, y: 25, r: 15 };
+const SETTINGS_MENU = { x: SETTINGS.x - SETTINGS.r, y: 46, w: 260, tab: SETTINGS.r, pad: 16 };
+const SLIDER_ACCENT = 0xffd23f;
+
+// Round-recap playback speeds the Speed button cycles through (and the
+// settings menu's speed slider steps through); the choice is remembered per
+// browser.
 const RECAP_SPEEDS = [1, 1.5, 2, 3];
 const RECAP_SPEED_KEY = "godfield.recapSpeed";
 
@@ -366,6 +368,8 @@ export class BattleScene extends Phaser.Scene {
   recapSpeed = 1;
   resultLayer: Phaser.GameObjects.Container | null = null; // the end-of-game screen, once shown
   statInfo: { key: StatKey; chip: Phaser.GameObjects.Container; layer: Phaser.GameObjects.Container } | null = null; // open stat explainer
+  settingsMenu: Phaser.GameObjects.Container | null = null; // the settings dropdown, while open
+  speedButton!: Button; // replay speed; its label follows the settings menu's speed slider
   resultDismissed = false; // closed with "View board"
   cpuPanel!: Phaser.GameObjects.Container;
   playerPanel!: Phaser.GameObjects.Container;
@@ -458,7 +462,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   get leaveLabel(): string {
-    return "Restart";
+    return "Leave Match";
+  }
+
+  // Where to go once the battle is over (the status line's last words).
+  get leaveHint(): string {
+    return `Choose "${this.leaveLabel}" in the settings menu to go back.`;
   }
 
   // The line under VICTORY / DEFEAT / DRAW.
@@ -523,8 +532,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
   statusMessage(): string {
-    if (this.battle.winner) return `${fighterName(this.battle.winner)} wins! Press "Restart" to play again.`;
-    if (this.battle.draw) return `Draw! Press "Restart" to play again.`;
+    if (this.battle.winner) return `${fighterName(this.battle.winner)} wins! ${this.leaveHint}`;
+    if (this.battle.draw) return `Draw! ${this.leaveHint}`;
     if (this.handHint) return `Round ${this.battle.round} — ${this.handHint}`;
     return `Round ${this.battle.round} — ${this.plannedAp()}/${this.battle.player.maxAp} AP left. Play cards or click your monsters to give orders, then End turn.`;
   }
@@ -567,7 +576,7 @@ export class BattleScene extends Phaser.Scene {
     this.logHidden = readLogHidden();
     this.logPanel = this.add.container(this.logHidden ? LOG_HIDE_DX : 0, 0);
     const logBacking = this.add.graphics();
-    logBacking.fillStyle(0x0b0d15, 0.72);
+    logBacking.fillStyle(0x0c0d0e, 0.72);
     logBacking.fillRoundedRect(LOG_BOX.x, LOG_BOX.y, LOG_BOX.w, LOG_BOX.h, 12);
     this.logPanel.add(logBacking);
 
@@ -577,31 +586,44 @@ export class BattleScene extends Phaser.Scene {
         .setOrigin(0.5, 0)
     );
 
-    const soundLabel = (): string => (isMuted() ? "Sound: off" : "Sound: on");
-    // Top-left, clear of the centered title and the right-side log column.
-    const soundButton = createButton(this, 24, 12, 110, 26, soundLabel(), {
+    // Top-left, clear of the centered title and the right-side log column:
+    // the settings gear (volume, account, replay speed), above the menu it
+    // opens so it stays clickable to close it.
+    const settingsButton = createCircleButton(this, SETTINGS.x, SETTINGS.y, SETTINGS.r, "", {
       color: COLORS.restart,
       hoverColor: COLORS.restartHover,
-      onClick: () => {
-        setMuted(!isMuted());
-        (soundButton.container.getAt(1) as Phaser.GameObjects.Text).setText(soundLabel());
-      },
+      onClick: () => this.toggleSettings(),
     });
+    settingsButton.container.setDepth(951);
+    // Esc does the same. Not over the end-of-game screen, which sits above
+    // the menu; the confirm dialogs catch Esc themselves before Phaser sees it.
+    this.input.keyboard?.on("keydown-ESC", () => {
+      if (!this.resultLayer) this.toggleSettings();
+    });
+    // The gear nearly fills the button; hovering also turns it a notch.
+    if (this.textures.exists(SETTINGS_ICON_KEY)) {
+      const gear = this.add.image(0, 0, SETTINGS_ICON_KEY).setDisplaySize(SETTINGS.r * 2 - 4, SETTINGS.r * 2 - 4);
+      settingsButton.container.add(gear);
+      const turn = (angle: number): void => {
+        this.tweens.killTweensOf(gear);
+        this.tweens.add({ targets: gear, angle, duration: 300, ease: "Cubic.easeOut" });
+      };
+      const bg = settingsButton.container.getAt(0) as Phaser.GameObjects.Graphics;
+      bg.on("pointerover", () => turn(45));
+      bg.on("pointerout", () => turn(0));
+    }
 
     // Speed of the end-of-round replay; takes effect immediately, even
     // mid-replay.
-    const speedLabel = (): string => `Speed ${this.recapSpeed}x`;
-    const speedButton = createButton(this, 24 + 110 + 8, 12, 100, 26, speedLabel(), {
+    this.speedButton = createButton(this, SETTINGS.x + SETTINGS.r + 10, 12, 100, 26, "", {
       color: COLORS.restart,
       hoverColor: COLORS.restartHover,
       onClick: () => {
         const i = RECAP_SPEEDS.indexOf(this.recapSpeed);
-        this.recapSpeed = RECAP_SPEEDS[(i + 1) % RECAP_SPEEDS.length] as number;
-        saveRecapSpeed(this.recapSpeed);
-        setRecapSpeed(this, this.recapSpeed);
-        (speedButton.container.getAt(1) as Phaser.GameObjects.Text).setText(speedLabel());
+        this.setReplaySpeed(RECAP_SPEEDS[(i + 1) % RECAP_SPEEDS.length] as number);
       },
     });
+    this.setReplaySpeed(this.recapSpeed);
 
     this.cpuPanel = this.add.container(0, 0);
     this.playerPanel = this.add.container(0, 0);
@@ -625,12 +647,6 @@ export class BattleScene extends Phaser.Scene {
       color: AP_GEM_COLOR,
       hoverColor: 0x4a95e0,
       onClick: () => this.onEndTurnClick(),
-    });
-
-    createButton(this, BUTTON_X, LEAVE_BUTTON_Y, BUTTON_W, BUTTON_H, this.leaveLabel, {
-      color: COLORS.restart,
-      hoverColor: COLORS.restartHover,
-      onClick: () => this.onLeave(),
     });
 
     this.logPanel.add(
@@ -911,8 +927,8 @@ export class BattleScene extends Phaser.Scene {
 
   // VICTORY / DEFEAT / DRAW in the middle of the screen, over everything,
   // once the game is over and the last round's recap has finished. "View
-  // board" closes it to look at the final state; the Restart/Leave button
-  // under the hand still works after that.
+  // board" closes it to look at the final state; Leave Match in the
+  // settings menu still works after that.
   showResult(): void {
     if (this.resultLayer || this.resultDismissed) return;
     const b = this.battle;
@@ -922,7 +938,7 @@ export class BattleScene extends Phaser.Scene {
 
     const layer = this.add.container(0, 0).setDepth(1000);
     this.resultLayer = layer;
-    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x05070d, 0.75).setOrigin(0, 0).setInteractive();
+    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x060607, 0.75).setOrigin(0, 0).setInteractive();
     layer.add(dim);
 
     if (result === RESULT.win) {
@@ -1376,7 +1392,7 @@ export class BattleScene extends Phaser.Scene {
           fontFamily: FONT_FAMILY,
           fontSize: "13px",
           fontStyle: "800",
-          color: "#11131c",
+          color: "#121315",
           align: "center",
           wordWrap: { width: cw - 12 },
         })
@@ -1427,6 +1443,213 @@ export class BattleScene extends Phaser.Scene {
         hoverTo(0);
       });
       hit.on("pointerdown", () => this.toggleStatInfo(container, box, chip.key, chip.color, cw, h));
+    });
+  }
+
+  setReplaySpeed(speed: number): void {
+    this.recapSpeed = speed;
+    saveRecapSpeed(speed);
+    setRecapSpeed(this, speed);
+    (this.speedButton.container.getAt(1) as Phaser.GameObjects.Text).setText(`Speed ${speed}x`);
+  }
+
+  // The settings dropdown: a tab hugging the gear that widens into a panel
+  // below it, with a volume slider, a stepped replay speed slider and, at the
+  // bottom, an account settings button (placeholder for now) and Leave
+  // Match. Esc opens it too; a click anywhere outside it (or on the gear, or
+  // Esc again) closes it.
+  openSettings(): void {
+    this.closeSettings();
+    const { x, y, w, tab, pad } = SETTINGS_MENU;
+    const menu = this.add.container(0, 0).setDepth(950);
+    this.settingsMenu = menu;
+
+    // Full-screen catcher behind the menu: closes it and keeps the click from
+    // reaching the board underneath.
+    const catcher = this.add.zone(0, 0, GAME_WIDTH, GAME_HEIGHT).setOrigin(0).setInteractive();
+    catcher.on("pointerdown", () => this.closeSettings());
+    menu.add(catcher);
+
+    const body = this.add.container(x, y);
+    menu.add(body);
+    const label = (ly: number, text: string): Phaser.GameObjects.Text =>
+      this.add.text(pad, ly, text, { fontFamily: FONT_FAMILY, fontSize: "13px", fontStyle: "700", color: TEXT.white });
+    const value = (ly: number): Phaser.GameObjects.Text =>
+      this.add.text(w - pad, ly, "", { fontFamily: FONT_FAMILY, fontSize: "13px", fontStyle: "700", color: TEXT.muted }).setOrigin(1, 0);
+
+    // Volume, 0-100%; a short blip on release previews the new level.
+    const volumeValue = value(14);
+    const showVolume = (v: number): void => {
+      volumeValue.setText(`${Math.round(v * 100)}%`);
+    };
+    showVolume(getVolume());
+    body.add([label(14, "Volume"), volumeValue]);
+    this.addSlider(body, pad, 46, w - pad * 2, {
+      value: getVolume(),
+      onChange: (v) => {
+        setVolume(v);
+        showVolume(v);
+      },
+      onRelease: () => playSfx("card"),
+    });
+
+    // Replay speed, one stop per RECAP_SPEEDS entry, labelled underneath.
+    const speedValue = value(72);
+    speedValue.setText(`${this.recapSpeed}x`);
+    body.add([label(72, "Animation speed"), speedValue]);
+    const trackW = w - pad * 2;
+    const steps = RECAP_SPEEDS.length;
+    this.addSlider(body, pad, 104, trackW, {
+      value: RECAP_SPEEDS.indexOf(this.recapSpeed) / (steps - 1),
+      steps,
+      onChange: (v) => {
+        const speed = RECAP_SPEEDS[Math.round(v * (steps - 1))] as number;
+        if (speed === this.recapSpeed) return;
+        this.setReplaySpeed(speed);
+        speedValue.setText(`${speed}x`);
+      },
+    });
+    RECAP_SPEEDS.forEach((speed, i) => {
+      body.add(
+        this.add
+          .text(pad + (trackW * i) / (steps - 1), 118, `${speed}x`, { fontFamily: FONT_FAMILY, fontSize: "10px", color: TEXT.muted })
+          .setOrigin(0.5, 0)
+      );
+    });
+
+    // Account settings, at the bottom: not designed yet, so the button just
+    // says so.
+    const account = createButton(this, pad, 146, w - pad * 2, 32, "Account settings", {
+      color: COLORS.restart,
+      hoverColor: COLORS.restartHover,
+      onClick: () => {
+        const text = account.container.getAt(1) as Phaser.GameObjects.Text;
+        text.setText("Coming soon");
+        this.time.delayedCall(1200, () => text.active && text.setText("Account settings"));
+      },
+    });
+    body.add(account.container);
+
+    // Leave Match, under it: back to the menu (online matches ask first,
+    // since leaving counts as a loss).
+    const leave = createButton(this, pad, 188, w - pad * 2, 32, this.leaveLabel, {
+      color: COLORS.ultimate,
+      hoverColor: COLORS.ultimateHover,
+      onClick: () => {
+        this.closeSettings();
+        void this.onLeave();
+      },
+    });
+    body.add(leave.container);
+    const h = 236;
+
+    // Background, added under everything once the height is known: one
+    // outlined shape, a tab behind the gear (round on top, sharing the gear's
+    // centre and left edge) running straight down into the panel.
+    const r = 12;
+    const gearY = SETTINGS.y - y; // the gear's centre, in panel coordinates
+    const bg = this.add.graphics();
+    bg.fillStyle(0x000000, 0.35);
+    bg.fillRoundedRect(4, 6, w, h, r);
+    bg.beginPath();
+    bg.moveTo(0, gearY);
+    bg.arc(tab, gearY, tab, Math.PI, 0);
+    bg.lineTo(tab * 2, 0);
+    bg.lineTo(w - r, 0);
+    bg.arc(w - r, r, r, -Math.PI / 2, 0);
+    bg.lineTo(w, h - r);
+    bg.arc(w - r, h - r, r, 0, Math.PI / 2);
+    bg.lineTo(r, h);
+    bg.arc(r, h - r, r, Math.PI / 2, Math.PI);
+    bg.closePath();
+    bg.fillStyle(COLORS.panel, 1);
+    bg.fillPath();
+    bg.lineStyle(1.5, COLORS.restartHover, 1);
+    bg.strokePath();
+    bg.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains); // clicks on the panel stay in it
+    body.addAt(bg, 0);
+
+    // Drop down from the gear.
+    body.setAlpha(0).setY(y - 10);
+    this.tweens.add({ targets: body, alpha: 1, y, duration: 160, ease: "Cubic.easeOut" });
+  }
+
+  toggleSettings(): void {
+    if (this.settingsMenu) this.closeSettings();
+    else this.openSettings();
+  }
+
+  closeSettings(): void {
+    if (!this.settingsMenu) return;
+    const menu = this.settingsMenu;
+    this.settingsMenu = null;
+    this.tweens.killTweensOf(menu.getAll());
+    menu.destroy(true);
+  }
+
+  // A horizontal slider in `parent` (track from (x, y), `w` long) whose value
+  // runs 0..1; with `steps`, it snaps to that many evenly spaced stops (with
+  // tick marks). Click or drag anywhere along it.
+  addSlider(
+    parent: Phaser.GameObjects.Container,
+    x: number,
+    y: number,
+    w: number,
+    { value, steps, onChange, onRelease }: { value: number; steps?: number; onChange: (v: number) => void; onRelease?: () => void }
+  ): void {
+    const g = this.add.graphics();
+    const knob = this.add.circle(0, y, 8, 0xffffff).setStrokeStyle(2, SLIDER_ACCENT);
+    parent.add([g, knob]);
+    const snap = (v: number): number => (steps ? Math.round(v * (steps - 1)) / (steps - 1) : v);
+    const draw = (v: number): void => {
+      g.clear();
+      g.fillStyle(COLORS.meterTrack, 1);
+      g.fillRoundedRect(x, y - 3, w, 6, 3);
+      if (v > 0) {
+        g.fillStyle(SLIDER_ACCENT, 1);
+        g.fillRoundedRect(x, y - 3, w * v, 6, 3);
+      }
+      for (let i = 0; steps && i < steps; i++) {
+        const tx = x + (w * i) / (steps - 1);
+        g.fillStyle(i / (steps - 1) <= v ? 0x121315 : 0x6c6e74, 1);
+        g.fillCircle(tx, y, 2);
+      }
+      knob.setX(x + w * v);
+    };
+    let current = snap(value);
+    draw(current);
+
+    // Pointer -> slider value, via the camera's (zoomed) layout coordinates.
+    const fromPointer = (pointer: Phaser.Input.Pointer): void => {
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      const next = snap(Phaser.Math.Clamp((world.x - parent.x - x) / w, 0, 1));
+      if (next === current) return;
+      current = next;
+      draw(current);
+      onChange(current);
+    };
+    let dragging = false;
+    const hit = this.add.zone(x - 10, y - 12, w + 20, 24).setOrigin(0).setInteractive({ useHandCursor: true });
+    parent.add(hit);
+    hit.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      dragging = true;
+      fromPointer(pointer);
+    });
+    const move = (pointer: Phaser.Input.Pointer): void => {
+      if (dragging && pointer.isDown) fromPointer(pointer);
+    };
+    const up = (): void => {
+      if (!dragging) return;
+      dragging = false;
+      onRelease?.();
+    };
+    this.input.on("pointermove", move);
+    this.input.on("pointerup", up);
+    this.input.on("pointerupoutside", up);
+    hit.once("destroy", () => {
+      this.input.off("pointermove", move);
+      this.input.off("pointerup", up);
+      this.input.off("pointerupoutside", up);
     });
   }
 
@@ -1809,7 +2032,7 @@ export class BattleScene extends Phaser.Scene {
     const card = this.battle.player.hand.find((c) => c.id === this.previewedCardId);
     if (!card || locked) return;
 
-    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x05070d, 0.6).setOrigin(0, 0).setInteractive();
+    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x060607, 0.6).setOrigin(0, 0).setInteractive();
     dim.on("pointerdown", () => this.dismissPreview());
     this.previewLayer.add(dim);
 
@@ -1858,7 +2081,7 @@ export class BattleScene extends Phaser.Scene {
     const targeting = this.targeting;
     if (!targeting) return;
     const opponent = this.battle.cpu;
-    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x05070d, 0.55).setOrigin(0, 0).setInteractive();
+    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x060607, 0.55).setOrigin(0, 0).setInteractive();
     dim.on("pointerdown", () => this.dismissPreview());
     this.previewLayer.add(dim);
 
@@ -1875,7 +2098,7 @@ export class BattleScene extends Phaser.Scene {
         this.tweens.add({ targets: g, alpha: 0.55, duration: 500, yoyo: true, repeat: -1 });
         g.once("destroy", () => this.tweens.killTweensOf(g));
       } else {
-        g.fillStyle(0x05070d, 0.45);
+        g.fillStyle(0x060607, 0.45);
         g.fillRoundedRect(x, y, w, h, 10);
       }
       this.previewLayer.add(g);
@@ -1917,7 +2140,7 @@ export class BattleScene extends Phaser.Scene {
     const index = player.field.findIndex((m) => m.uid === this.monsterMenuUid);
     const monster = player.field[index];
     if (!monster) return;
-    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x05070d, 0.45).setOrigin(0, 0).setInteractive();
+    const dim = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x060607, 0.45).setOrigin(0, 0).setInteractive();
     dim.on("pointerdown", () => this.dismissPreview());
     this.previewLayer.add(dim);
 
@@ -1974,7 +2197,7 @@ export class BattleScene extends Phaser.Scene {
   drawCardBack(): Phaser.GameObjects.Container {
     const container = this.add.container(0, 0);
     const g = this.add.graphics();
-    g.fillStyle(0x1b1f2c, 1);
+    g.fillStyle(0x1a1b1e, 1);
     g.fillRoundedRect(0, 0, CARD_W, CARD_H, 10);
     g.lineStyle(3, 0xc49b3a, 1);
     g.strokeRoundedRect(0, 0, CARD_W, CARD_H, 10);
@@ -2006,7 +2229,7 @@ export class BattleScene extends Phaser.Scene {
     ];
     for (const { key, x } of sides) {
       const frame = this.add.graphics();
-      frame.lineStyle(2, 0x4a5573, 1);
+      frame.lineStyle(2, 0x484b51, 1);
       frame.strokeRoundedRect(x, SLOT_Y, SLOT_W, SLOT_H, 10);
       this.slotsContainer.add(frame);
 
@@ -2083,7 +2306,7 @@ export class BattleScene extends Phaser.Scene {
     for (const { fighter, x, label } of sides) {
       const field = fighter.field ?? [];
       const backing = this.add.graphics();
-      backing.fillStyle(0x0b0d15, 0.5);
+      backing.fillStyle(0x0c0d0e, 0.5);
       backing.fillRoundedRect(x, FIELD_Y, FIELD_W, FIELD_H, 10);
       this.fieldContainer.add(backing);
       this.fieldContainer.add(

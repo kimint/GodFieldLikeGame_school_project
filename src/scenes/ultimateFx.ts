@@ -37,7 +37,7 @@ const THEMES: Record<string, UltimateTheme> = {
   guardian: { color: 0xffd23f, dark: 0x122235, text: "#ffe9a8", play: guardianUltimate },
   pyromancer: { color: 0xff7a1a, dark: 0x2a0b05, text: "#ffb36b", play: pyromancerUltimate },
 };
-const DEFAULT_THEME: UltimateTheme = { color: 0xffd23f, dark: 0x1b1f2c, text: "#ffd23f", play: genericUltimate };
+const DEFAULT_THEME: UltimateTheme = { color: 0xffd23f, dark: 0x1a1b1e, text: "#ffd23f", play: genericUltimate };
 
 export async function playUltimate(
   run: RecapRun,
