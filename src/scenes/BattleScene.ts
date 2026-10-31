@@ -714,6 +714,10 @@ export class BattleScene extends Phaser.Scene {
 
     this.render();
     loadCardArt(this, allCards(), () => this.render());
+    // Text is drawn once, so redraw when the card fonts (index.html) arrive.
+    Promise.all(["700 16px Cinzel", '900 16px "Exo 2"', "600 16px Inter"].map((font) => document.fonts.load(font)))
+      .then(() => this.sys.isActive() && this.render())
+      .catch(() => {});
   }
 
   scrollLog(deltaPixels: number): void {

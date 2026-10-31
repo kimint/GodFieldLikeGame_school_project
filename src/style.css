@@ -236,13 +236,6 @@ body {
 .gallery-art.fallback.debuff { background: #6a4a94; }
 .gallery-art.fallback.monster { background: #8a6a2a; }
 
-.gallery-name {
-  margin-top: 8px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
 .gallery-desc,
 .gallery-decks {
   margin-top: 4px;
@@ -628,31 +621,6 @@ body {
   text-align: left;
 }
 
-.deck-detail-art {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
-  border-radius: 10px;
-  font-size: 16px;
-}
-
-.deck-detail-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.deck-detail-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #e8eaf0;
-}
-
-.deck-detail-cat,
 .deck-breakdown-item {
   padding: 2px 8px;
   border-radius: 999px;
@@ -662,11 +630,11 @@ body {
   color: #ffffff;
 }
 
-.deck-detail-cat.attack, .deck-breakdown-item.attack, .deck-filter.attack.selected { background: #b5423a; }
-.deck-detail-cat.defend, .deck-breakdown-item.defend, .deck-filter.defend.selected { background: #2f6f8f; }
-.deck-detail-cat.buff, .deck-breakdown-item.buff, .deck-filter.buff.selected { background: #3a8f5a; }
-.deck-detail-cat.debuff, .deck-breakdown-item.debuff, .deck-filter.debuff.selected { background: #6a4a94; }
-.deck-detail-cat.monster, .deck-breakdown-item.monster, .deck-filter.monster.selected { background: #8a6a2a; }
+.deck-breakdown-item.attack, .deck-filter.attack.selected { background: #b5423a; }
+.deck-breakdown-item.defend, .deck-filter.defend.selected { background: #2f6f8f; }
+.deck-breakdown-item.buff, .deck-filter.buff.selected { background: #3a8f5a; }
+.deck-breakdown-item.debuff, .deck-filter.debuff.selected { background: #6a4a94; }
+.deck-breakdown-item.monster, .deck-filter.monster.selected { background: #8a6a2a; }
 
 .deck-detail-text {
   margin: 0;
@@ -852,7 +820,7 @@ body {
     column-gap: 12px;
   }
 
-  .deck-detail-art {
+  .deck-detail .framed-card {
     grid-row: span 5;
   }
 
@@ -1027,4 +995,117 @@ body {
 
 @keyframes dialog-pop {
   from { opacity: 0; transform: scale(0.95); }
+}
+
+/* --- Framed card (src/components/FramedCard.tsx) ---------------------------
+   The card frame art (public/ui/card-frame.webp, 382x512) with its slots
+   placed in percentages of the image, matching src/scenes/cardFace.ts. Text
+   is sized in cqw (1% of the card's width) so it scales with the card. */
+
+.framed-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 382 / 512;
+  container-type: inline-size;
+  background: url("/ui/card-frame.webp") center / 100% 100% no-repeat;
+  user-select: none;
+}
+
+.framed-card > * {
+  position: absolute;
+  box-sizing: border-box;
+}
+
+.framed-card-art {
+  left: 7.85%;
+  top: 12.89%;
+  width: 82.2%;
+  height: 54.69%;
+  object-fit: cover;
+}
+
+.framed-card-art.fallback { opacity: 0.35; }
+.framed-card.attack .framed-card-art.fallback { background: #b5423a; }
+.framed-card.defend .framed-card-art.fallback { background: #2f6f8f; }
+.framed-card.buff .framed-card-art.fallback { background: #3a8f5a; }
+.framed-card.debuff .framed-card-art.fallback { background: #6a4a94; }
+.framed-card.monster .framed-card-art.fallback { background: #8a6a2a; }
+
+.framed-card-name {
+  left: 6.28%;
+  top: 3.91%;
+  width: 68.06%;
+  height: 7.23%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  font-family: Cinzel, "Trajan Pro", Georgia, serif;
+  font-weight: 700;
+  font-size: 5.6cqw;
+  text-transform: uppercase;
+  color: #ffd700;
+  -webkit-text-stroke: 0.25cqw #5a3a12;
+  paint-order: stroke fill;
+  text-shadow: 0 0.4cqw 0.8cqw #000000;
+}
+
+.framed-card-cost {
+  left: 78.8%;
+  top: 4.69%;
+  width: 11.52%;
+  height: 8.59%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Exo 2", Impact, "Arial Black", sans-serif;
+  font-weight: 900;
+  font-size: 8cqw;
+  color: #ffffff;
+  -webkit-text-stroke: 0.5cqw #000000;
+  paint-order: stroke fill;
+}
+
+.framed-card-category {
+  left: 25.65%;
+  top: 69.34%;
+  width: 43.19%;
+  height: 4.1%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1cqw;
+  font-family: Cinzel, "Trajan Pro", Georgia, serif;
+  font-weight: 700;
+  font-size: 3.9cqw;
+  letter-spacing: 0.6cqw;
+  text-transform: uppercase;
+  color: #f5f5f5;
+}
+
+.framed-card.attack .framed-card-category { background: rgba(181, 66, 58, 0.9); }
+.framed-card.defend .framed-card-category { background: rgba(47, 111, 143, 0.9); }
+.framed-card.buff .framed-card-category { background: rgba(58, 143, 90, 0.9); }
+.framed-card.debuff .framed-card-category { background: rgba(106, 74, 148, 0.9); }
+.framed-card.monster .framed-card-category { background: rgba(138, 106, 42, 0.9); }
+
+.framed-card-text {
+  left: 10.47%;
+  top: 75.59%;
+  width: 77.23%;
+  height: 18.55%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5cqw 2.5cqw;
+  overflow: hidden;
+  border-radius: 1.2cqw;
+  background: rgba(26, 26, 26, 0.78);
+  font-family: Inter, system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 5.2cqw;
+  line-height: 1.2;
+  text-align: center;
+  color: #fff8dc;
 }

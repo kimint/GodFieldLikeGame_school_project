@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactElement } from "react";
 import { allCards, deckEntriesForCard, getCatalog, type CatalogCardEntry } from "../model/catalog.ts";
-import { CARD_CATEGORY, cardCost } from "../model/cardTypes.ts";
+import { CARD_CATEGORY } from "../model/cardTypes.ts";
 import { describeCard, describeMonsterOrders } from "../model/engine.ts";
 import type { Card } from "../model/cardTypes.ts";
+import { FramedCard } from "./FramedCard.tsx";
 
 const CATEGORY_ORDER = [CARD_CATEGORY.ATTACK, CARD_CATEGORY.DEFEND, CARD_CATEGORY.BUFF, CARD_CATEGORY.DEBUFF, CARD_CATEGORY.MONSTER];
 const ALL = "all";
@@ -96,15 +97,7 @@ function GalleryCard({ card }: { card: CatalogCardEntry }): ReactElement {
   const orders = describeMonsterOrders({ ...card.props, category: card.category } as Card);
   return (
     <div className="gallery-card">
-      {card.imageUrl ? (
-        <img className="gallery-art" src={card.imageUrl} alt={`${card.name} artwork`} loading="lazy" />
-      ) : (
-        <div className={`gallery-art fallback ${card.category}`}>{capitalize(card.category)}</div>
-      )}
-      <div className="gallery-name">{card.name}</div>
-      <div className="gallery-desc">
-        {cardCost(card.props)} AP · {description}
-      </div>
+      <FramedCard card={card} description={description} />
       {orders ? <div className="gallery-desc">{orders}</div> : null}
       <div className="gallery-decks">
         {entries.length > 0

@@ -24,6 +24,7 @@ export const CARD_ICON_KEY: Record<CardCategory, string> = {
 
 export const ULTIMATE_ICON_KEY = "icon-ultimate";
 export const SETTINGS_ICON_KEY = "icon-settings";
+export const CARD_FRAME_KEY = "ui-card-frame"; // raster art: public/ui/card-frame.webp
 
 export function classIconKey(classId: string): string {
   return `icon-class-${classId}`;
@@ -47,6 +48,9 @@ export function preloadIcons(scene: Phaser.Scene, classDefs: ClassDef[]): void {
   }
   queueSvg(scene, ULTIMATE_ICON_KEY, ultimateIconMarkup());
   queueSvg(scene, SETTINGS_ICON_KEY, settingsIconMarkup());
+  if (!scene.textures.exists(CARD_FRAME_KEY)) {
+    scene.load.image(CARD_FRAME_KEY, `${import.meta.env.BASE_URL}ui/card-frame.webp`);
+  }
   for (const classDef of classDefs) {
     queueSvg(scene, classIconKey(classDef.id), classIconMarkup(classDef));
   }
