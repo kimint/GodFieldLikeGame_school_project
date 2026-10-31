@@ -1,6 +1,7 @@
-import { useMemo, useState, type ReactElement } from "react";
+import { useMemo, useState, type DragEvent, type ReactElement } from "react";
 import type { ClassDef } from "../model/classes.ts";
-import { cardCost, type Card } from "../model/cardTypes.ts";
+import { CARD_CATEGORY, cardCost, type Card, type CardCategory } from "../model/cardTypes.ts";
+import type { CatalogCardEntry } from "../model/catalog.ts";
 import { describeCard, describeMonsterOrders } from "../model/engine.ts";
 import {
   DECK_RULES,
@@ -25,12 +26,83 @@ export interface DeckBuilderProps {
 // new deck that hasn't been saved yet.
 type Draft = { kind: "starter" } | { kind: "saved"; id: string } | { kind: "new" };
 
+type Filter = "all" | CardCategory;
+
+const CATEGORIES = Object.values(CARD_CATEGORY);
+const CATEGORY_LABEL: Record<CardCategory, string> = {
+  attack: "Attack",
+  defend: "Defend",
+  buff: "Buff",
+  debuff: "Debuff",
+  monster: "Monster",
+};
+
+// Drag payloads: where the card came from, so a drop knows whether to add or remove.
+const DRAG_TYPE = "text/plain";
+const dragFrom = (source: "pool" | "deck", cardId: string) => (e: DragEvent): void => {
+  e.dataTransfer.setData(DRAG_TYPE, `${source}:${cardId}`);
+  e.dataTransfer.effectAllowed = "move";
+};
+const readDrag = (e: DragEvent): { source: string; cardId: string } => {
+  const [source = "", cardId = ""] = e.dataTransfer.getData(DRAG_TYPE).split(":");
+  return { source, cardId };
+};
+
 const toCounts = (list: DeckListEntry[]): Record<string, number> =>
   Object.fromEntries(list.map((e) => [e.cardId, e.copies]));
 
+// Deck order: by category, then AP cost, then name.
+const byCategoryCost = (a: CatalogCardEntry, b: CatalogCardEntry): number =>
+  CATEGORIES.indexOf(a.category) - CATEGORIES.indexOf(b.category) ||
+  cardCost(a.props) - cardCost(b.props) ||
+  a.name.localeCompare(b.name);
+
+const asCard = (card: CatalogCardEntry): Card => ({ ...card.props, category: card.category, name: card.name }) as Card;
+
+interface CardTileProps {
+  card: CatalogCardEntry;
+  badge?: string;
+  dim?: boolean;
+  selected?: boolean;
+  draggable?: boolean;
+  onSelect: () => void;
+  onPrimary?: () => void; // double-click
+  onSecondary?: () => void; // right-click
+  onDragStart?: (e: DragEvent) => void;
+}
+
+/** One card as a small portrait tile: art, AP cost, name. */
+function CardTile({ card, badge, dim, selected, draggable, onSelect, onPrimary, onSecondary, onDragStart }: CardTileProps): ReactElement {
+  return (
+    <button
+      type="button"
+      className={`card-tile ${card.category}${dim ? " dim" : ""}${selected ? " selected" : ""}`}
+      title={card.name}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onClick={onSelect}
+      onDoubleClick={onPrimary}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onSelect();
+        onSecondary?.();
+      }}
+    >
+      {card.imageUrl ? (
+        <img className="card-tile-art" src={card.imageUrl} alt="" loading="lazy" draggable={false} />
+      ) : (
+        <span className={`card-tile-art gallery-art fallback ${card.category}`}>{card.category}</span>
+      )}
+      <span className="card-tile-cost">{cardCost(card.props)}</span>
+      {badge ? <span className="card-tile-badge">{badge}</span> : null}
+      <span className="card-tile-name">{card.name}</span>
+    </button>
+  );
+}
+
 /** Deck builder (React shell): the starter deck plus up to 3 custom decks for one class. */
 export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, confirm, onBack }: DeckBuilderProps): ReactElement {
-  const pool = useMemo(() => classCardPool(classDef), [classDef]);
+  const pool = useMemo(() => [...classCardPool(classDef)].sort(byCategoryCost), [classDef]);
   const starter = useMemo(() => starterDeckList(classDef), [classDef]);
 
   const openFor = (id: string | null): { draft: Draft; name: string; counts: Record<string, number> } => {
@@ -47,12 +119,31 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(pool[0]?.id ?? null);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
+  const [dropTarget, setDropTarget] = useState<"deck" | "pool" | null>(null);
 
   const readOnly = draft.kind === "starter";
   const list: DeckListEntry[] = pool.filter((c) => (counts[c.id] ?? 0) > 0).map((c) => ({ cardId: c.id, copies: counts[c.id]! }));
   const total = deckSize(list);
   const problem = validateDeckList(classDef, list);
   const atLimit = decks.length >= DECK_RULES.maxDecksPerClass;
+  const sizeOk = total >= DECK_RULES.minCards && total <= DECK_RULES.maxCards;
+
+  // One tile per copy, in deck order.
+  const deckTiles = pool.flatMap((card) => Array.from({ length: counts[card.id] ?? 0 }, (_, i) => ({ card, key: `${card.id}-${i}` })));
+  const perCategory = CATEGORIES.map((cat) => ({
+    cat,
+    n: pool.filter((c) => c.category === cat).reduce((sum, c) => sum + (counts[c.id] ?? 0), 0),
+  })).filter((x) => x.n > 0);
+
+  const query = search.trim().toLowerCase();
+  const shownPool = pool.filter(
+    (c) => (filter === "all" || c.category === filter) && (!query || c.name.toLowerCase().includes(query))
+  );
+  const selected = pool.find((c) => c.id === selectedId) ?? null;
+  const selectedCopies = selected ? (counts[selected.id] ?? 0) : 0;
 
   // Switching away from unsaved edits asks first.
   const guard = (go: () => void): void => {
@@ -81,6 +172,32 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
     setCounts((c) => ({ ...c, [cardId]: Math.max(0, Math.min(DECK_RULES.maxCopies, copies)) }));
     setDirty(true);
   };
+
+  const addOne = (cardId: string): void => {
+    if (readOnly || (counts[cardId] ?? 0) >= DECK_RULES.maxCopies) return;
+    setCopies(cardId, (counts[cardId] ?? 0) + 1);
+  };
+
+  const removeOne = (cardId: string): void => {
+    if (readOnly || (counts[cardId] ?? 0) === 0) return;
+    setCopies(cardId, (counts[cardId] ?? 0) - 1);
+  };
+
+  const dropZone = (zone: "deck" | "pool") => ({
+    onDragOver: (e: DragEvent): void => {
+      if (readOnly) return;
+      e.preventDefault();
+      setDropTarget(zone);
+    },
+    onDragLeave: (): void => setDropTarget(null),
+    onDrop: (e: DragEvent): void => {
+      e.preventDefault();
+      setDropTarget(null);
+      const { source, cardId } = readDrag(e);
+      if (zone === "deck" && source === "pool") addOne(cardId);
+      if (zone === "pool" && source === "deck") removeOne(cardId);
+    },
+  });
 
   const save = async (): Promise<void> => {
     if (readOnly || busy || problem || !name.trim()) return;
@@ -123,17 +240,34 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
     d.kind === draft.kind && (d.kind !== "saved" || (draft.kind === "saved" && d.id === draft.id));
 
   return (
-    <div className="shell-screen">
+    <div className="shell-screen deck-builder">
       <div className="shell-topbar">
         <span className="shell-title">{classDef.name} decks</span>
         <button type="button" className="shell-button" onClick={() => guard(onBack)}>
           ← Back
         </button>
       </div>
-      <p className="shell-subtitle">
-        Starter deck + up to {DECK_RULES.maxDecksPerClass} of your own. {DECK_RULES.minCards}–{DECK_RULES.maxCards} cards,
-        at most {DECK_RULES.maxCopies} copies of each {classDef.name} card.
-      </p>
+      <ul className="deck-rules" aria-label="Deck rules">
+        <li className={`deck-rule${sizeOk ? " ok" : " bad"}`}>
+          <span className="deck-rule-label">Deck size</span>
+          <span className="deck-rule-value">
+            {DECK_RULES.minCards}–{DECK_RULES.maxCards} cards
+          </span>
+          <span className="deck-rule-now">now {total}</span>
+        </li>
+        <li className="deck-rule ok">
+          <span className="deck-rule-label">Copies</span>
+          <span className="deck-rule-value">max {DECK_RULES.maxCopies} of each card</span>
+          <span className="deck-rule-now">{classDef.name} cards only</span>
+        </li>
+        <li className={`deck-rule${atLimit ? " full" : " ok"}`}>
+          <span className="deck-rule-label">Custom decks</span>
+          <span className="deck-rule-value">up to {DECK_RULES.maxDecksPerClass} + starter</span>
+          <span className="deck-rule-now">
+            {decks.length}/{DECK_RULES.maxDecksPerClass} used
+          </span>
+        </li>
+      </ul>
 
       <div className="deck-tabs">
         <button
@@ -165,97 +299,170 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
         </button>
       </div>
 
-      <div className="deck-editor">
-        <div className="deck-editor-head">
-          <input
-            className="deck-name"
-            type="text"
-            maxLength={DECK_RULES.maxNameLength}
-            value={name}
-            disabled={readOnly}
-            onChange={(e) => {
-              setName(e.target.value);
-              setDirty(true);
-            }}
-          />
-          <span className={`deck-count${problem ? " bad" : ""}`}>
-            {total} cards
-          </span>
-        </div>
-        {readOnly ? (
-          <p className="shell-note deck-hint">
-            Every player has this deck and it can&apos;t be edited. Use &quot;Copy to a new deck&quot; to start your own from it.
-          </p>
-        ) : null}
-
-        <div className="deck-rows">
-          {pool.map((card) => {
-            const copies = counts[card.id] ?? 0;
-            const description = describeCard({ ...card.props, category: card.category, name: card.name } as Card);
-            return (
-              <div key={card.id} className={`deck-row${copies === 0 ? " empty" : ""}`}>
-                {card.imageUrl ? (
-                  <img className="deck-art" src={card.imageUrl} alt="" loading="lazy" />
-                ) : (
-                  <div className={`deck-art gallery-art fallback ${card.category}`} />
-                )}
-                <div className="deck-row-text">
-                  <div className="gallery-name">{card.name}</div>
-                  <div className="gallery-desc">
-                    {cardCost(card.props)} AP · {description}
-                  </div>
-                  {card.category === "monster" ? (
-                    <div className="gallery-desc">{describeMonsterOrders({ ...card.props, category: card.category } as Card)}</div>
-                  ) : null}
-                </div>
-                <div className="deck-stepper">
-                  <button
-                    type="button"
-                    aria-label={`Remove a ${card.name}`}
-                    disabled={readOnly || copies === 0}
-                    onClick={() => setCopies(card.id, copies - 1)}
-                  >
-                    −
-                  </button>
-                  <span>{copies}</span>
-                  <button
-                    type="button"
-                    aria-label={`Add a ${card.name}`}
-                    disabled={readOnly || copies >= DECK_RULES.maxCopies}
-                    onClick={() => setCopies(card.id, copies + 1)}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {problem && !readOnly ? <p className="auth-error">{problem}</p> : null}
-        {error ? <p className="auth-error">{error}</p> : null}
-
-        <div className="shell-actions">
-          {readOnly ? (
-            <button type="button" className="shell-button gold" disabled={atLimit} onClick={() => startNew(list)}>
-              Copy to a new deck
-            </button>
-          ) : (
+      <div className="deck-workspace">
+        {/* Left: the selected card, large. */}
+        <aside className="deck-panel deck-detail">
+          {selected ? (
             <>
-              <button
-                type="button"
-                className="shell-button gold"
-                disabled={busy || Boolean(problem) || !name.trim() || (!dirty && draft.kind === "saved")}
-                onClick={() => void save()}
-              >
-                {busy ? "Saving…" : draft.kind === "new" ? "Create deck" : dirty ? "Save changes" : "Saved"}
-              </button>
-              <button type="button" className="shell-button danger" disabled={busy} onClick={remove}>
-                {draft.kind === "new" ? "Cancel" : "Delete deck"}
-              </button>
+              {selected.imageUrl ? (
+                <img className="deck-detail-art" src={selected.imageUrl} alt="" />
+              ) : (
+                <div className={`deck-detail-art gallery-art fallback ${selected.category}`}>{selected.category}</div>
+              )}
+              <div className="deck-detail-name">{selected.name}</div>
+              <div className="deck-detail-meta">
+                <span className={`deck-detail-cat ${selected.category}`}>{CATEGORY_LABEL[selected.category]}</span>
+                <span>{cardCost(selected.props)} AP</span>
+              </div>
+              <p className="deck-detail-text">{describeCard(asCard(selected))}</p>
+              {selected.category === "monster" ? (
+                <p className="deck-detail-text">{describeMonsterOrders(asCard(selected))}</p>
+              ) : null}
+              <div className="deck-stepper deck-detail-stepper">
+                <button
+                  type="button"
+                  aria-label={`Remove a ${selected.name}`}
+                  disabled={readOnly || selectedCopies === 0}
+                  onClick={() => removeOne(selected.id)}
+                >
+                  −
+                </button>
+                <span>
+                  {selectedCopies}/{DECK_RULES.maxCopies}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`Add a ${selected.name}`}
+                  disabled={readOnly || selectedCopies >= DECK_RULES.maxCopies}
+                  onClick={() => addOne(selected.id)}
+                >
+                  +
+                </button>
+              </div>
             </>
+          ) : (
+            <p className="shell-note">Pick a card to see it here.</p>
           )}
-        </div>
+        </aside>
+
+        {/* Middle: the deck itself, one tile per copy. */}
+        <section className="deck-panel deck-main">
+          <div className="deck-editor-head">
+            <input
+              className="deck-name"
+              type="text"
+              maxLength={DECK_RULES.maxNameLength}
+              value={name}
+              disabled={readOnly}
+              onChange={(e) => {
+                setName(e.target.value);
+                setDirty(true);
+              }}
+            />
+            <span className={`deck-count${problem ? " bad" : ""}`}>
+              {total}/{DECK_RULES.maxCards}
+            </span>
+          </div>
+          <div className="deck-breakdown">
+            {perCategory.map(({ cat, n }) => (
+              <span key={cat} className={`deck-breakdown-item ${cat}`}>
+                {CATEGORY_LABEL[cat]} {n}
+              </span>
+            ))}
+          </div>
+          {readOnly ? (
+            <p className="shell-note deck-hint">
+              Every player has this deck and it can&apos;t be edited. Use &quot;Copy to a new deck&quot; to start your own from it.
+            </p>
+          ) : null}
+
+          <div className={`deck-grid${dropTarget === "deck" ? " drop" : ""}`} {...dropZone("deck")}>
+            {deckTiles.map(({ card, key }) => (
+              <CardTile
+                key={key}
+                card={card}
+                selected={card.id === selectedId}
+                draggable={!readOnly}
+                onDragStart={dragFrom("deck", card.id)}
+                onSelect={() => setSelectedId(card.id)}
+                onPrimary={() => removeOne(card.id)}
+                onSecondary={() => removeOne(card.id)}
+              />
+            ))}
+            {deckTiles.length === 0 ? <p className="shell-note deck-grid-empty">Drag cards here from the right.</p> : null}
+          </div>
+
+          {problem && !readOnly ? <p className="auth-error">{problem}</p> : null}
+          {error ? <p className="auth-error">{error}</p> : null}
+
+          <div className="shell-actions">
+            {readOnly ? (
+              <button type="button" className="shell-button gold" disabled={atLimit} onClick={() => startNew(list)}>
+                Copy to a new deck
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="shell-button gold"
+                  disabled={busy || Boolean(problem) || !name.trim() || (!dirty && draft.kind === "saved")}
+                  onClick={() => void save()}
+                >
+                  {busy ? "Saving…" : draft.kind === "new" ? "Create deck" : dirty ? "Save changes" : "Saved"}
+                </button>
+                <button type="button" className="shell-button danger" disabled={busy} onClick={remove}>
+                  {draft.kind === "new" ? "Cancel" : "Delete deck"}
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* Right: the class's card pool, filterable. */}
+        <section className={`deck-panel deck-pool${dropTarget === "pool" ? " drop" : ""}`} {...dropZone("pool")}>
+          <input
+            className="deck-search"
+            type="search"
+            placeholder="Search cards"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="deck-filters">
+            {(["all", ...CATEGORIES] as Filter[]).map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`deck-filter ${f}${filter === f ? " selected" : ""}`}
+                onClick={() => setFilter(f)}
+              >
+                {f === "all" ? "All" : CATEGORY_LABEL[f]}
+              </button>
+            ))}
+          </div>
+          <div className="pool-grid">
+            {shownPool.map((card) => {
+              const copies = counts[card.id] ?? 0;
+              return (
+                <CardTile
+                  key={card.id}
+                  card={card}
+                  badge={`${copies}/${DECK_RULES.maxCopies}`}
+                  dim={copies >= DECK_RULES.maxCopies}
+                  selected={card.id === selectedId}
+                  draggable={!readOnly && copies < DECK_RULES.maxCopies}
+                  onDragStart={dragFrom("pool", card.id)}
+                  onSelect={() => setSelectedId(card.id)}
+                  onPrimary={() => addOne(card.id)}
+                  onSecondary={() => removeOne(card.id)}
+                />
+              );
+            })}
+            {shownPool.length === 0 ? <p className="shell-note">No cards match.</p> : null}
+          </div>
+          <p className="shell-note deck-controls-hint">
+            {readOnly ? "Click a card to read it." : "Double-click or drag to add · right-click to remove"}
+          </p>
+        </section>
       </div>
     </div>
   );

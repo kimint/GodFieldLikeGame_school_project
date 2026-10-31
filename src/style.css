@@ -380,11 +380,66 @@ body {
   color: #a9abb0;
 }
 
-.deck-editor {
-  margin-top: 14px;
-  padding: 16px;
-  border-radius: 12px;
+.deck-rules {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.deck-rule {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border-left: 4px solid #4a5573;
+  border-radius: 8px;
   background: rgba(42, 47, 66, 0.94);
+  text-align: left;
+}
+
+.deck-rule.ok {
+  border-left-color: #8fdca7;
+}
+
+.deck-rule.bad {
+  border-left-color: #ff8f86;
+}
+
+.deck-rule.full {
+  border-left-color: #a8842f;
+}
+
+.deck-rule-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a9adc1;
+}
+
+.deck-rule-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.deck-rule-now {
+  font-size: 12px;
+  color: #a9adc1;
+}
+
+.deck-rule.bad .deck-rule-now {
+  color: #ff8f86;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .deck-rules {
+    grid-template-columns: 1fr;
+  }
 }
 
 .deck-editor-head {
@@ -417,42 +472,273 @@ body {
   text-align: left;
 }
 
-.deck-rows {
+/* Deck builder: card detail | deck | card pool */
+
+.shell-screen.deck-builder {
+  width: 100%;
+  max-width: 1280px;
+}
+
+.deck-workspace {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 320px;
+  gap: 12px;
+  margin-top: 14px;
+  align-items: start;
+}
+
+.deck-panel {
+  padding: 14px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: rgba(42, 47, 66, 0.94);
+}
+
+.deck-panel.drop,
+.deck-grid.drop {
+  border-color: #a8842f;
+}
+
+.deck-detail {
+  position: sticky;
+  top: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 14px;
+  text-align: left;
 }
 
-.deck-row {
+.deck-detail-art {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.deck-detail-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.deck-detail-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e8eaf0;
+}
+
+.deck-detail-cat,
+.deck-breakdown-item {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #4a5573;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.deck-detail-cat.attack, .deck-breakdown-item.attack, .deck-filter.attack.selected { background: #b5423a; }
+.deck-detail-cat.defend, .deck-breakdown-item.defend, .deck-filter.defend.selected { background: #2f6f8f; }
+.deck-detail-cat.buff, .deck-breakdown-item.buff, .deck-filter.buff.selected { background: #3a8f5a; }
+.deck-detail-cat.debuff, .deck-breakdown-item.debuff, .deck-filter.debuff.selected { background: #6a4a94; }
+.deck-detail-cat.monster, .deck-breakdown-item.monster, .deck-filter.monster.selected { background: #8a6a2a; }
+
+.deck-detail-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #c9ccda;
+}
+
+.deck-detail-stepper {
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.deck-detail-stepper span {
+  width: auto;
+  min-width: 40px;
+}
+
+.deck-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.deck-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 8px;
+  min-height: 220px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 2px dashed #3a4157;
   border-radius: 10px;
-  background: #232427;
+  background: #1b1f2c;
+  align-content: start;
 }
 
-.deck-row.empty {
-  opacity: 0.6;
+.deck-grid-empty {
+  grid-column: 1 / -1;
+  align-self: center;
 }
 
-.deck-art {
-  flex: none;
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
+.deck-search {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #4a5573;
   border-radius: 8px;
-  background: #1a1b1e;
+  background: #1b1f2c;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
 }
 
-.deck-row-text {
-  flex: 1;
-  min-width: 0;
+.deck-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
 }
 
-.deck-row-text .gallery-name {
-  margin-top: 0;
+.deck-filter {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #2f354a;
+  color: #c9ccda;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.deck-filter.selected {
+  background: #a8842f;
+  color: #ffffff;
+}
+
+.pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.deck-controls-hint {
+  margin-top: 10px;
+}
+
+.card-tile {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 2px solid #2f354a;
+  border-radius: 8px;
+  background: #1b1f2c;
+  color: #ffffff;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.card-tile:hover {
+  transform: translateY(-2px);
+  border-color: #6a7598;
+}
+
+.card-tile.selected {
+  border-color: #e0b84f;
+}
+
+.card-tile.dim {
+  opacity: 0.45;
+}
+
+.card-tile.attack { border-bottom-color: #b5423a; }
+.card-tile.defend { border-bottom-color: #2f6f8f; }
+.card-tile.buff { border-bottom-color: #3a8f5a; }
+.card-tile.debuff { border-bottom-color: #6a4a94; }
+.card-tile.monster { border-bottom-color: #8a6a2a; }
+
+.card-tile-art {
+  display: flex;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 0;
+  font-size: 11px;
+}
+
+.card-tile-cost {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(20, 23, 34, 0.85);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+.card-tile-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(20, 23, 34, 0.85);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.card-tile-name {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 14px 5px 4px;
+  background: linear-gradient(transparent, rgba(12, 14, 22, 0.92));
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+@media (max-width: 1000px) {
+  .deck-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-detail {
+    position: static;
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    column-gap: 12px;
+  }
+
+  .deck-detail-art {
+    grid-row: span 5;
+  }
+
+  .pool-grid {
+    max-height: 360px;
+  }
 }
 
 .deck-stepper {
