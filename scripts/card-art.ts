@@ -13,6 +13,10 @@
 //
 // Each card id below has its own emblem; a card without one (e.g. a new row
 // added in the dashboard) gets its category's generic emblem instead.
+//
+// A card with painted art in public/cards/<card id>.(png|jpg|jpeg|webp) uses
+// that instead: --upload points its cards.image_url at /cards/<file> (served
+// by the site) rather than uploading the generated SVG.
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -21,6 +25,7 @@ import { LOCAL_CATALOG_ROWS } from "../src/model/catalogData.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_DIR = join(ROOT, "card-art");
+const PAINTED_DIR = join(ROOT, "public", "cards");
 const BUCKET = "card-images";
 
 const W = 480;
@@ -302,6 +307,14 @@ interface ArtFile {
   path: string;
 }
 
+// The site path of a card's painted art in public/cards/, if it has any.
+function paintedArt(id: string): string | null {
+  for (const ext of ["png", "jpg", "jpeg", "webp"]) {
+    if (existsSync(join(PAINTED_DIR, `${id}.${ext}`))) return `/cards/${id}.${ext}`;
+  }
+  return null;
+}
+
 async function upload(files: ArtFile[], sandbox: boolean): Promise<void> {
   // --sandbox: the dev project (.env.sandbox + .env.sandbox.local) instead of the main one.
   const [envFile, localFile] = sandbox ? [".env.sandbox", ".env.sandbox.local"] : [".env", ".env.local"];
@@ -316,6 +329,13 @@ async function upload(files: ArtFile[], sandbox: boolean): Promise<void> {
   const admin = createClient(url, key, { auth: { persistSession: false } });
 
   for (const { id, path } of files) {
+    const painted = paintedArt(id);
+    if (painted) {
+      const { error } = await admin.from("cards").update({ image_url: painted }).eq("id", id);
+      if (error) throw new Error(`update cards.image_url for ${id}: ${error.message}`);
+      console.log(`kept painted art ${painted} -> cards.image_url`);
+      continue;
+    }
     const objectPath = `${id}.svg`;
     const { error: uploadError } = await admin.storage
       .from(BUCKET)
