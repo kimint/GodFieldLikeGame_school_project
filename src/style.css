@@ -337,6 +337,126 @@ body {
   width: 100%;
 }
 
+/* --- Match history (class select) ------------------------------------ */
+
+.history-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 16px;
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #2a2f42;
+}
+
+.history-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-content: flex-start;
+  gap: 6px 10px;
+}
+
+.history-record-label {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #a9adc1;
+}
+
+.history-recent .history-record-label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.history-count {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.history-count.win,
+.history-result.win {
+  color: #6fd08c;
+}
+
+.history-count.draw,
+.history-result.draw {
+  color: #c9cfe0;
+}
+
+.history-count.loss,
+.history-result.loss {
+  color: #ef6f6f;
+}
+
+.history-rate {
+  width: 100%;
+  font-size: 13px;
+  color: #e8eaf0;
+}
+
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 13px;
+  border-top: 1px solid #363c54;
+}
+
+.history-row:first-child {
+  border-top: 0;
+}
+
+.history-result {
+  width: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.history-matchup {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-vs,
+.history-opponent,
+.history-meta {
+  color: #a9adc1;
+}
+
+.history-meta {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.history-empty {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #a9adc1;
+}
+
+@media (max-width: 640px) {
+  .history-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .history-meta {
+    display: none;
+  }
+}
+
 /* --- Decks (picker on class select + deck builder) ------------------ */
 
 .deck-tabs {
