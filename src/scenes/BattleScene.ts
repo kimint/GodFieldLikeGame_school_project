@@ -487,6 +487,12 @@ export class BattleScene extends Phaser.Scene {
     return createBattle(playerClass, cpuClass, { playerDeck: data.playerDeck ?? null });
   }
 
+  // The big name on a fighter's portrait and panel: the class for vs-CPU,
+  // the player's name online (RandomBattleScene).
+  displayName(fighter: Fighter): string {
+    return shortName(fighter.classDef.name);
+  }
+
   get playerLabel(): string {
     return "Player";
   }
@@ -1245,7 +1251,7 @@ export class BattleScene extends Phaser.Scene {
       this.add.text(cx, 94, label.toUpperCase(), { fontFamily: FONT_FAMILY, fontSize: "11px", fontStyle: "700", color: TEXT.muted }).setOrigin(0.5, 0)
     );
     container.add(
-      this.add.text(cx, 112, shortName(fighter.classDef.name), {
+      this.add.text(cx, 112, this.displayName(fighter), {
         fontFamily: FONT_FAMILY,
         fontSize: "15px",
         fontStyle: "700",
@@ -1275,7 +1281,7 @@ export class BattleScene extends Phaser.Scene {
 
   // Returns the gap left between the AP pill and "Hand N" (for the HP bar).
   drawPanelHeader(container: Phaser.GameObjects.Container, fighter: Fighter, w: number): { left: number; right: number } {
-    const name = this.add.text(STRIP_PAD, 6, shortName(fighter.classDef.name), {
+    const name = this.add.text(STRIP_PAD, 6, this.displayName(fighter), {
       fontFamily: FONT_FAMILY,
       fontSize: "14px",
       fontStyle: "700",
@@ -2009,7 +2015,7 @@ export class BattleScene extends Phaser.Scene {
       this.add.text(cx, 86, this.playerLabel.toUpperCase(), { fontFamily: FONT_FAMILY, fontSize: "11px", fontStyle: "700", color: TEXT.muted }).setOrigin(0.5, 0)
     );
     c.add(
-      this.add.text(cx, 102, shortName(player.classDef.name), {
+      this.add.text(cx, 102, this.displayName(player), {
         fontFamily: FONT_FAMILY,
         fontSize: "15px",
         fontStyle: "700",

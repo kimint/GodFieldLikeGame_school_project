@@ -107,7 +107,12 @@ export class BattleRoom extends Room {
   // each rematch.
   private startBattle() {
     const [p1, p2] = this.seats as [Seat, Seat];
+    // Fighters go by player name (battle log, panels); the same name twice
+    // gets (P1)/(P2).
+    const sameName = p1.username === p2.username;
     this.battle = createBattle(p1.classDef, p2.classDef, {
+      playerLabel: sameName ? `${p1.username} (P1)` : p1.username,
+      cpuLabel: sameName ? `${p2.username} (P2)` : p2.username,
       playerDeck: p1.deckList ? buildDeckFromList(p1.deckList) : null,
       cpuDeck: p2.deckList ? buildDeckFromList(p2.deckList) : null,
     });

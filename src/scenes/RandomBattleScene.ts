@@ -4,7 +4,7 @@
 
 import { BattleScene, type BattleSceneData, type ResultAction } from "./BattleScene.ts";
 import { COLORS, type Button } from "./theme.ts";
-import { isBattleOver, type Action } from "../model/engine.ts";
+import { isBattleOver, type Action, type Fighter } from "../model/engine.ts";
 import { deserializeFighter } from "../model/serialize.ts";
 import type { BattleView } from "../online/matchApi.ts";
 import type { RandomMatch, RandomMatchView } from "../online/randomMatch.ts";
@@ -106,10 +106,19 @@ export class RandomBattleScene extends BattleScene {
     return "Opponent";
   }
 
+  // Online, fighters are shown by player name (set by the server as the
+  // fighter's label); the class still shows as the portrait icon.
+  override displayName(fighter: Fighter): string {
+    return fighter.label ?? super.displayName(fighter);
+  }
+
   override resultSubtitle(): string {
     const b = this.battle;
     if (b.winner === b.player && b.log[0]?.includes("left the match")) return "Your opponent left the match.";
-    return super.resultSubtitle();
+    const opponent = `${this.displayName(b.cpu)} (${b.cpu.classDef.name.replace(/\s*\(.*\)$/, "")})`;
+    if (b.draw) return "Both fighters went down at the same time.";
+    if (b.winner === b.player) return `You defeated ${opponent} in round ${b.round}.`;
+    return `${opponent} wins in round ${b.round}.`;
   }
 
   override canAct(): boolean {
