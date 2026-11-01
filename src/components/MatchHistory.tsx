@@ -34,7 +34,7 @@ export function MatchHistory({ username, history, error, onBack }: MatchHistoryP
           ← Back
         </button>
       </div>
-      <p className="shell-subtitle">{username} · PvP games only</p>
+      <p className="shell-subtitle">{username} · Random matches only</p>
       {error ? (
         <p className="shell-note">Couldn&apos;t load your match history: {error}</p>
       ) : (

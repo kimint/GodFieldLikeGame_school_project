@@ -58,6 +58,7 @@ export class BattleRoom extends Room {
   private turnEndsAt: number | null = null;
   private turnTimer: Delayed | null = null;
   private recorded = false;
+  private isPrivate = false; // private room: games here don't count toward the record
   private game = 0; // counts battles in this room; goes up on each rematch
   private rematchEndsAt: number | null = null;
   private rematchTimer: Delayed | null = null;
@@ -123,6 +124,7 @@ export class BattleRoom extends Room {
 
   async onCreate(options: JoinOptions) {
     if (options.private) {
+      this.isPrivate = true;
       // The room code is the room id, so joinById(code) finds it.
       let code = randomCode();
       for (let i = 0; i < 5 && (await matchMaker.query({ roomId: code })).length > 0; i++) code = randomCode();
@@ -265,7 +267,8 @@ export class BattleRoom extends Room {
   // only the last 5. A failed write only costs the record, not the match.
   private async recordResult() {
     const battle = this.battle;
-    if (!battle || this.recorded || this.seats.length < 2) return;
+    // Only random matches count; private rooms are friendly games.
+    if (!battle || this.isPrivate || this.recorded || this.seats.length < 2) return;
     this.recorded = true;
     const rows = this.seats.map((seat) => {
       const me = this.fighterOf(seat);

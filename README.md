@@ -194,7 +194,8 @@ rules are the same in both modes. A private room is a private Colyseus room whos
   a new battle with the same classes and decks (the room's `game` counter goes up and the scene
   restarts). If the opponent leaves or drops → "Your opponent left. Returning to the lobby in 5s…".
   If 30s pass → everyone returns to the menu (after "Your opponent didn't accept the rematch." if
-  you had asked). Each game is recorded separately in `match_history`. A mid-battle forfeit
+  you had asked). Only random matches go into `match_history` (My Record), each game separately;
+  private rooms are friendly games and are not recorded. A mid-battle forfeit
   closes the room with no rematch.
 - **Messages.** Browser → server: `pick` (the turn), `rematch`. Server → browser: `state`
   (`RandomMatchView` in `src/online/randomMatchView.ts`, with `turnMsLeft`,
