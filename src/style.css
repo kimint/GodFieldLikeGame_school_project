@@ -330,6 +330,63 @@ body {
   width: 100%;
 }
 
+/* --- Account settings ---------------------------------------------- */
+
+.account-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 28px;
+  text-align: center;
+}
+
+.account-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #2a2f42;
+  border: 3px solid #c49b3a;
+  box-shadow: 0 0 18px rgba(196, 155, 58, 0.35);
+}
+
+.account-avatar svg {
+  width: 72%;
+  height: 72%;
+  margin-top: 18%;
+  fill: #a9abb0;
+}
+
+.account-profile-name {
+  margin-top: 12px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #e3c06d;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.account-profile-email {
+  margin-top: 2px;
+  font-size: 13px;
+  color: #a9abb0;
+  overflow-wrap: anywhere;
+}
+
+.account-password {
+  margin-top: 24px;
+}
+
+.account-section-title {
+  margin: 0 0 14px;
+  font-size: 16px;
+  text-align: center;
+  color: #ffffff;
+}
+
 /* --- Match history (class select) ------------------------------------ */
 
 .history-panel {

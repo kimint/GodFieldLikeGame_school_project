@@ -42,6 +42,7 @@ import type { StatKey } from "../model/stats.ts";
 import { cardCost, type Card, type DefendCard } from "../model/cardTypes.ts";
 import type { ClassDef } from "../model/classes.ts";
 import { allCards, allClasses } from "../model/catalog.ts";
+import { confirmDialog } from "../ui/dialog.ts";
 import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY, SETTINGS_ICON_KEY } from "../phaserIcons.ts";
 import { loadCardArt, loadedArtKey } from "../cardArt.ts";
 import { getVolume, playSfx, setVolume } from "../fx/sound.ts";
@@ -364,6 +365,7 @@ export interface BattleSceneData {
   playerClass: ClassDef;
   playerDeck?: Card[] | null; // a custom deck (decks.ts); null/absent = starter deck
   onExit?: (() => void) | null;
+  onAccountSettings?: (() => void) | null; // leave the match and open Account settings; null = no account
 }
 
 // One button on the end-of-game screen.
@@ -389,6 +391,7 @@ export const TURN_SECONDS = 30;
 export class BattleScene extends Phaser.Scene {
   battle!: Battle;
   onExit: (() => void) | null = null;
+  onAccountSettings: (() => void) | null = null;
   recapPlaying = false;
   recapRun: RoundRecapRun | null = null; // active recap (speed/skip control) -- see roundRecap.ts
   shownHp: HpPair | null = null; // { player, cpu } while a recap is counting HP down
@@ -574,6 +577,26 @@ export class BattleScene extends Phaser.Scene {
     this.scene.start("ClassSelectScene");
   }
 
+  // Account settings button: going there ends this match, so ask first.
+  async openAccountSettings(): Promise<void> {
+    const go = this.onAccountSettings;
+    if (!go) return;
+    const sure = await confirmDialog({
+      title: "Going to account settings will leave match",
+      message: "Are you sure?",
+      confirmLabel: "Yes",
+      danger: true,
+    });
+    if (!sure || !this.sys.isActive()) return;
+    this.exitMatch(go);
+  }
+
+  // Leave the match without asking and hand over to `go`. vs-CPU has nothing
+  // to tear down; online scenes override this to leave the room.
+  exitMatch(go: () => void): void {
+    go();
+  }
+
   // AP left after the cards picked so far.
   plannedAp(): number {
     return checkPlan(this.battle.player, this.staged, false, this.orders).ap;
@@ -627,6 +650,7 @@ export class BattleScene extends Phaser.Scene {
   create(data: BattleSceneData): void {
     useRenderScale(this);
     this.onExit = data.onExit ?? null;
+    this.onAccountSettings = data.onAccountSettings ?? null;
     this.recapPlaying = false;
     this.clearPlanning();
     this.pendingTurn = null;
@@ -1563,7 +1587,7 @@ export class BattleScene extends Phaser.Scene {
 
   // The settings dropdown: a tab hugging the gear that widens into a panel
   // below it, with a volume slider, a stepped replay speed slider and, at the
-  // bottom, an account settings button (placeholder for now) and Leave
+  // bottom, an account settings button and Leave
   // Match. Esc opens it too; a click anywhere outside it (or on the gear, or
   // Esc again) closes it.
   openSettings(): void {
@@ -1625,15 +1649,20 @@ export class BattleScene extends Phaser.Scene {
       );
     });
 
-    // Account settings, at the bottom: not designed yet, so the button just
-    // says so.
+    // Account settings, at the bottom: asks first, since it leaves the match.
+    // Without an account (online features off) there's nothing to show.
     const account = createButton(this, pad, 146, w - pad * 2, 32, "Account settings", {
       color: COLORS.restart,
       hoverColor: COLORS.restartHover,
       onClick: () => {
-        const text = account.container.getAt(1) as Phaser.GameObjects.Text;
-        text.setText("Coming soon");
-        this.time.delayedCall(1200, () => text.active && text.setText("Account settings"));
+        if (!this.onAccountSettings) {
+          const text = account.container.getAt(1) as Phaser.GameObjects.Text;
+          text.setText("Not logged in");
+          this.time.delayedCall(1200, () => text.active && text.setText("Account settings"));
+          return;
+        }
+        this.closeSettings();
+        void this.openAccountSettings();
       },
     });
     body.add(account.container);

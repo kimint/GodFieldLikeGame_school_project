@@ -62,3 +62,19 @@ export async function markTutorialSeen(): Promise<void> {
   const { error } = await supabase.auth.updateUser({ data: { tutorial_seen: true } });
   if (error) throw new Error(error.message);
 }
+
+// Change the logged-in player's password. The current password is checked
+// first by logging in with it again (Supabase's updateUser alone doesn't ask
+// for it), which also counts as a fresh login for projects that require one
+// before a password change.
+export async function changePassword(email: string, currentPassword: string, newPassword: string): Promise<void> {
+  const { error: checkError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+  if (checkError) {
+    throw new Error(/invalid login credentials/i.test(checkError.message) ? "Your current password is wrong." : checkError.message);
+  }
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) {
+    if (/should be different/i.test(error.message)) throw new Error("The new password must be different from the current one.");
+    throw new Error(error.message);
+  }
+}
