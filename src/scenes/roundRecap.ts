@@ -7,10 +7,9 @@
 //
 // Driven entirely by each fighter's `lastTurn` (see TurnRecord in
 // engine.ts), so it works the same for vs-CPU and online battles. Steps
-// play in the engine's own resolution order: both sides' defend / buff /
-// debuff / monster cards first (yours, then theirs, each in pick order),
-// then every attack and ultimate in strike order, then monsters, then
-// statuses.
+// play in the engine's own resolution order: both sides' buff, debuff,
+// defend and monster cards first (in setup order), then every attack and
+// ultimate in strike order, then monsters, then statuses.
 //
 // It plays at the viewer's chosen speed (setRecapSpeed, the battle screen's
 // speed button); clicking anywhere during the recap fast-forwards it.
@@ -109,16 +108,14 @@ export async function playRoundRecap(scene: RecapCapableScene, recap: RoundRecap
 
   // Same order the engine resolved things in.
   const keys: Key[] = ["player", "cpu"];
-  for (const key of keys) {
-    const plays = recap.sides[key].turn.plays ?? [];
-    if (plays.length === 0) await passStep(run, key);
-    for (const play of plays) if (!dealsDamage(play)) await playStep(run, key, play);
-  }
-  const strikes = keys
-    .flatMap((key) => (recap.sides[key].turn.plays ?? []).filter(dealsDamage).map((play) => ({ key, play })))
-    .sort((a, b) => (a.play.order ?? 99) - (b.play.order ?? 99));
-  if (strikes.length > 0 && recap.sides.player.turn.dice !== null && recap.sides.cpu.turn.dice !== null) await diceBanner(run);
-  for (const { key, play } of strikes) await playStep(run, key, play);
+  for (const key of keys) if ((recap.sides[key].turn.plays ?? []).length === 0) await passStep(run, key);
+  if (recap.sides.player.turn.dice !== null && recap.sides.cpu.turn.dice !== null) await diceBanner(run);
+  const inOrder = (pick: (play: PlayRecord) => boolean) =>
+    keys
+      .flatMap((key) => (recap.sides[key].turn.plays ?? []).filter(pick).map((play) => ({ key, play })))
+      .sort((a, b) => (a.play.order ?? 99) - (b.play.order ?? 99));
+  for (const { key, play } of inOrder((p) => !dealsDamage(p))) await playStep(run, key, play);
+  for (const { key, play } of inOrder(dealsDamage)) await playStep(run, key, play);
   await playMonsterHits(run);
   await playStatusTicks(run);
 
@@ -174,7 +171,7 @@ async function roundBanner(run: RoundRecapRun): Promise<void> {
   text.destroy();
 }
 
-// The dice that settled a priority tie between the two sides.
+// The dice that settled a tie between the two sides (setup or priority).
 async function diceBanner(run: RoundRecapRun): Promise<void> {
   const { scene, recap, layer } = run;
   const { player, cpu } = recap.sides;

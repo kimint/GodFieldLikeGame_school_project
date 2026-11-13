@@ -49,6 +49,9 @@ Vite serves it as-is.
    (click one there to take it back), add your ultimate if it's charged, then press
    **End turn** (with nothing picked, that's a pass). You have **30 seconds** per turn; when
    time runs out, your turn ends with whatever you had planned (or a pass if it can't be paid for).
+   - Non-attack cards take effect first, by type: **buffs, then debuffs, then defends, then
+     monster summons**. Where both sides played the same type, each side's die roll for the
+     round decides whose go first.
    - Attacks and ultimates go in **priority** order (fast cards first; where the two sides tie,
      each side's die roll for the round decides). A fighter knocked out mid-way gets none of
      their remaining strikes, and a landed "interrupts" card cancels the opponent's next attack

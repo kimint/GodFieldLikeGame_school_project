@@ -92,6 +92,10 @@ From the team's "Card Design" doc; see `src/model/engine.ts` for the exact rules
   it again plays it onto your arena slot (only your client sees it until the turn ends),
   clicking anywhere else cancels. Picked cards can be clicked to take them back.
 - **UA charge**: cards can add extra ultimate meter when played (Master Craftsman).
+- **Setup order**: before any strike, both sides' non-attack cards take effect in one queue by
+  type — buffs, then debuffs, then defends, then monster summons. Where both sides played a
+  card of the same type, the same per-round dice (below) decide whose go first; a side's own
+  cards of one type keep their pick order. Costs (and "gain AP") are still paid in pick order.
 - **Priority and dice**: every attack card and ultimate of both sides goes in one queue by
   priority (fast cards first, Slow lowers it). Where the two sides tie on priority, each side
   rolls one die for the round and the higher roll goes first on every tie; a side's own
