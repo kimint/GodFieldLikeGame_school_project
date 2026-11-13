@@ -14,7 +14,7 @@ body {
   justify-content: center;
   /* Letterbox surround is replaced by .ambient-bg below; keep a flat
      fallback color if the artwork fails to load. */
-  background-color: #1f2023;
+  background-color: #08090b;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: #e9eaec;
 }
@@ -45,18 +45,41 @@ body {
 .phaser-mount canvas {
   max-width: 100%;
   max-height: 100%;
+  /* The mount is a flexbox, so it owns centering. Phaser's autoCenter would
+     add top/left margins and shift the canvas; keep them at zero. */
+  margin: 0 !important;
+  /* Thin bronze edge + dark outer ring, drawn as shadows so the canvas
+     size/Scale.FIT measurement is untouched. */
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgba(201, 162, 39, 0.28),
+    0 0 0 3px rgba(8, 9, 11, 0.92),
+    0 24px 80px rgba(0, 0, 0, 0.65);
 }
 
-/* Full-viewport ambient extension of the battle hall: cover, blurred and
-   darkened, scaled slightly past the edges so the blur never shows a seam.
-   Letterbox margins read as out-of-focus scene depth instead of flat color. */
+/* Full-viewport ambient extension of the battle hall: cover, heavily
+   blurred, desaturated and darkened. The canvas should be the focus; the
+   surround reads as dim, out-of-focus depth rather than a second copy of the
+   scene. */
 .ambient-bg {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: url("/backgrounds/battle.svg") center / cover no-repeat #1f2023;
-  filter: blur(10px) brightness(0.55);
+  background: url("/backgrounds/battle.svg") center / cover no-repeat #08090b;
+  filter: blur(12px) brightness(0.60) saturate(0.90);
   transform: scale(1.06);
+}
+
+.ambient-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(8, 9, 11, 0) 0%,
+    rgba(8, 9, 11, 0.10) 60%,
+    rgba(8, 9, 11, 0.45) 100%
+  );
 }
 
 /* --- React shell screens ------------------------------------------- */

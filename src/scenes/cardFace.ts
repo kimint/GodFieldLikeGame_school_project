@@ -77,7 +77,7 @@ const SLOT = {
 export const CARD_FONT = {
   title: "Cinzel, 'Trajan Pro', Georgia, serif",
   cost: "'Exo 2', Impact, 'Arial Black', sans-serif",
-  body: `Inter, ${FONT_FAMILY}`,
+  body: FONT_FAMILY,
 };
 
 // Shrink a text object (never grow it) until it fits in maxW x maxH.

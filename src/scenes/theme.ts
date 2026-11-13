@@ -38,7 +38,32 @@ export const TEXT: { body: string; muted: string; white: string } = {
   white: "#ffffff",
 };
 
-export const FONT_FAMILY = "system-ui, -apple-system, 'Segoe UI', sans-serif";
+// Battle-screen palette. Kept separate from COLORS so the menus / older
+// scenes can keep their original values while the board moves to the
+// preview's warmer, more translucent look.
+export const UI_COLORS = {
+  panel: 0x121315,
+  panelAlpha: 0.82,
+  edge: 0x3a3529,
+  bronze: 0xa8842f,
+  bronzeHi: 0xd8b95c,
+  bronzeDark: 0x3a2d12,
+  railInk: 0x0b0c0e,
+  ivory: "#f2ead8",
+  body: "#c9ccd1",
+  muted: "#9a9da3",
+  faint: "#74777e",
+  gold: "#b9a77c",
+  goldHi: "#e0c060",
+  up: "#6be39a",
+  down: "#ff6b5f",
+  guard: 0x6ec6ff,
+} as const;
+
+export const FONT_UI = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
+export const FONT_DISPLAY = "Cinzel, 'Trajan Pro', Georgia, serif";
+// Legacy alias: most battle text is UI text.
+export const FONT_FAMILY = FONT_UI;
 
 // --- Crisp rendering on high-DPI / scaled-up screens ----------------------
 //

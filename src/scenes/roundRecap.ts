@@ -68,6 +68,7 @@ export interface RecapSlot {
 export interface RoundRecap {
   round: number;
   stage: { y: number; h: number }; // screen band the recap covers
+  centerX?: number; // center of the play zone (defaults to the board center)
   sides: { player: RecapSide; cpu: RecapSide };
   speed?: number; // playback speed, 1 = normal
 }
@@ -94,8 +95,12 @@ export async function playRoundRecap(scene: RecapCapableScene, recap: RoundRecap
   overlay.setInteractive();
   overlay.on("pointerdown", () => skip(run));
   const hint = scene.add
-    .text(944, stageY + stageH - 8, "click to skip", { fontFamily: FONT_FAMILY, fontSize: "11px", color: TEXT.muted })
-    .setOrigin(1, 1);
+    .text(recap.centerX ?? GAME_WIDTH / 2, stageY + stageH - 8, "click to skip", {
+      fontFamily: FONT_FAMILY,
+      fontSize: "11px",
+      color: TEXT.muted,
+    })
+    .setOrigin(0.5, 1);
   layer.add([overlay, hint]);
   overlay.setAlpha(0);
   await tween(run, { targets: overlay, alpha: 1, duration: 150 });
@@ -151,7 +156,7 @@ async function roundBanner(run: RoundRecapRun): Promise<void> {
   const { scene, recap, layer } = run;
   const cy = recap.stage.y + recap.stage.h / 2;
   const text = scene.add
-    .text(GAME_WIDTH / 2, cy, `Round ${recap.round}`, {
+    .text(recap.centerX ?? GAME_WIDTH / 2, cy, `Round ${recap.round}`, {
       fontFamily: FONT_FAMILY,
       fontSize: "40px",
       fontStyle: "800",
@@ -177,7 +182,7 @@ async function diceBanner(run: RoundRecapRun): Promise<void> {
   const cy = recap.stage.y + recap.stage.h / 2;
   const text = scene.add
     .text(
-      GAME_WIDTH / 2,
+      recap.centerX ?? GAME_WIDTH / 2,
       cy,
       `Dice: ${player.who} ${player.turn.dice} · ${cpu.who} ${cpu.turn.dice}\n${winner.who} win${winner.who === "You" ? "" : "s"} the ties!`,
       {
@@ -209,7 +214,7 @@ function captionFor(run: RoundRecapRun, side: RecapSide, title: string): {
   const { scene, recap, layer } = run;
   const scx = side.slot.x + side.slot.w / 2;
   const cy = recap.stage.y + recap.stage.h / 2 + 4;
-  const leftSide = scx < GAME_WIDTH / 2;
+  const leftSide = scx < (recap.centerX ?? GAME_WIDTH / 2);
   // Beside the slot, toward the middle of the screen.
   const caption = scene.add.container(leftSide ? scx + CARD_W / 2 + 24 : scx - CARD_W / 2 - 24, cy - 44).setAlpha(0);
   const align = leftSide ? 0 : 1;
@@ -445,7 +450,7 @@ async function phaseBanner(run: RoundRecapRun, label: string): Promise<void> {
   const { scene, recap, layer } = run;
   const cy = recap.stage.y + recap.stage.h / 2;
   const text = scene.add
-    .text(GAME_WIDTH / 2, cy, label, { fontFamily: FONT_FAMILY, fontSize: "30px", fontStyle: "800", color: TEXT.white, stroke: "#000000", strokeThickness: 6 })
+    .text(recap.centerX ?? GAME_WIDTH / 2, cy, label, { fontFamily: FONT_FAMILY, fontSize: "30px", fontStyle: "800", color: TEXT.white, stroke: "#000000", strokeThickness: 6 })
     .setOrigin(0.5)
     .setAlpha(0);
   layer.add(text);

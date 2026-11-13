@@ -88,8 +88,8 @@ function pickCardText(cardName: string, intro: string, extra = ""): (s: Tutorial
 const focusHandCard = (cardId: string) => (s: TutorialBattleScene): Rect | null =>
   previewing(s, cardId) ? null : s.handCardRect(cardId);
 const focusEndTurn = (): Rect => {
-  const { x, y, r } = LAYOUT.endTurn;
-  return { x: x - r, y: y - r, w: r * 2, h: r * 2 };
+  const { x, y, w, h } = LAYOUT.endTurn;
+  return { x, y, w, h };
 };
 const endTurnStep = (id: string, text: string): Step => ({
   id,
@@ -456,7 +456,7 @@ export class TutorialBattleScene extends BattleScene {
 
   // No turn timer in the tutorial: take as long as you like.
   onTurnTick(): void {
-    if (this.statusText?.active) this.statusText.setText(this.statusMessage());
+    if (this.statusText?.active) this.setStatus(this.statusMessage());
   }
 
   commitAction(action: Action): void {
