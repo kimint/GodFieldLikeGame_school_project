@@ -77,7 +77,14 @@ export const AP_RULES = {
 } as const;
 
 export const FIELD_SIZE = 3; // monsters per side
-const ULTIMATE_PRIORITY = 1;
+export const ULTIMATE_PRIORITY = 1;
+
+// A card's strike priority, for showing on its face: an attack card's
+// `priority` when it has one above 0, else null.
+export function cardPriority(card: Card): number | null {
+  if (card.category !== CARD_CATEGORY.ATTACK) return null;
+  return (card.priority ?? 0) > 0 ? (card.priority ?? 0) : null;
+}
 
 // Dice rolls and the CPU's choices. Tests swap in a seeded source.
 let random: () => number = Math.random;
@@ -188,7 +195,8 @@ export interface PlayRecord {
   damageType: DamageType | null;
   element: Element | null;
   cost: number | null;
-  description: string | null;
+  description: string | null; // describeCard text, without the priority (see `priority`)
+  priority: number | null; // strike priority shown as a badge (attack cards above 0, and the ultimate)
   target: string | null; // who an attack card was aimed at (a monster's name, or "fighter")
   damage: number | null;
   guarded: number; // absorbed by the target's defend card
@@ -655,7 +663,8 @@ function newPlay(card: Card | null): PlayRecord {
     damageType: (card as { damageType?: DamageType } | null)?.damageType ?? null,
     element: card?.element ?? null,
     cost: card ? cardCost(card) : null,
-    description: card ? describeCard(card) : null,
+    description: card ? describeCard(card, { priority: false }) : null,
+    priority: card ? cardPriority(card) : ULTIMATE_PRIORITY,
     target: null,
     damage: null,
     guarded: 0,
@@ -1354,14 +1363,16 @@ export function describeMonsterOrders(card: Card): string {
 }
 
 // What a card does, short enough for the face of a hand card. The AP cost is
-// drawn separately (cost gem), so it isn't repeated here.
-export function describeCard(card: Card): string {
+// drawn separately (cost gem), so it isn't repeated here. Card faces draw
+// the priority as their own badge (cardFace.ts, FramedCard.tsx) and pass
+// `priority: false` to leave it out of the text.
+export function describeCard(card: Card, { priority = true }: { priority?: boolean } = {}): string {
   const parts: string[] = [];
   switch (card.category) {
     case CARD_CATEGORY.ATTACK: {
       const atk = card as AttackCard;
       parts.push(`${atk.element ?? atk.damageType} ${atk.value}${atk.target === "field" ? " to all monsters" : ""}`);
-      if ((atk.priority ?? 0) > 0) parts.push("fast");
+      if (priority && (atk.priority ?? 0) > 0) parts.push(`Priority ${atk.priority}`);
       if (atk.interrupts) parts.push("interrupts");
       if (atk.lifesteal) parts.push("lifesteal");
       for (const status of atk.applies ?? []) parts.push(describeStatus(status));

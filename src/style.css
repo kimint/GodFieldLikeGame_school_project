@@ -1132,3 +1132,32 @@ body {
   text-align: center;
   color: #fff8dc;
 }
+
+/* Strike priority: an amber badge at the top center of the text box, as on
+   the battle screen's cards (src/scenes/cardFace.ts). */
+.framed-card-text.has-priority {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 1cqw;
+  padding-top: 1cqw;
+}
+
+.framed-card-text.has-priority > span:last-child {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.framed-card-priority {
+  padding: 0.3cqw 2.4cqw;
+  border-radius: 999px;
+  border: 0.4cqw solid #ffe7a8;
+  background: #ffb020;
+  color: #2a1600;
+  font-family: "Exo 2", Impact, "Arial Black", sans-serif;
+  font-weight: 900;
+  font-size: 4.4cqw;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  white-space: nowrap;
+}

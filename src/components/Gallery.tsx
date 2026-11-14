@@ -93,7 +93,7 @@ export function Gallery({ onBack }: GalleryProps): ReactElement {
 function GalleryCard({ card }: { card: CatalogCardEntry }): ReactElement {
   const entries = deckEntriesForCard(card.id);
   // Describe via a battle instance shape (props spread flat like createCardInstance).
-  const description = describeCard({ ...card.props, category: card.category, name: card.name } as Card);
+  const description = describeCard({ ...card.props, category: card.category, name: card.name } as Card, { priority: false });
   const orders = describeMonsterOrders({ ...card.props, category: card.category } as Card);
   return (
     <div className="gallery-card">

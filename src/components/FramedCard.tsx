@@ -14,6 +14,9 @@ export interface FramedCardProps {
  * bottom. Sized by its container's width; see .framed-card in style.css.
  */
 export function FramedCard({ card, description }: FramedCardProps): ReactElement {
+  // Strike priority, on an amber badge atop the text (attack cards above 0).
+  const raw = card.category === "attack" ? Number(card.props.priority ?? 0) : 0;
+  const priority = raw > 0 ? raw : null;
   return (
     <div className={`framed-card ${card.category}`}>
       {card.imageUrl ? (
@@ -24,7 +27,10 @@ export function FramedCard({ card, description }: FramedCardProps): ReactElement
       <div className="framed-card-name">{card.name}</div>
       <div className="framed-card-cost">{cardCost(card.props)}</div>
       <div className="framed-card-category">{card.category}</div>
-      <div className="framed-card-text">{description}</div>
+      <div className={`framed-card-text${priority !== null ? " has-priority" : ""}`}>
+        {priority !== null && <span className="framed-card-priority">PRIORITY {priority}</span>}
+        <span>{description}</span>
+      </div>
     </div>
   );
 }

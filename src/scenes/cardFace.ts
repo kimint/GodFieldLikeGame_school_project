@@ -9,7 +9,7 @@ import { COLORS, FONT_FAMILY, roundedRect } from "./theme.ts";
 import { CARD_FRAME_KEY, CARD_ICON_KEY, ULTIMATE_ICON_KEY, damageAccentColor, elementAccentColor } from "../phaserIcons.ts";
 import { loadedArtKey } from "../cardArt.ts";
 import { cardCost, type Card } from "../model/cardTypes.ts";
-import { describeCard, type PlayRecord } from "../model/engine.ts";
+import { cardPriority, describeCard, ULTIMATE_PRIORITY, type PlayRecord } from "../model/engine.ts";
 import type { DamageType, Element } from "../model/damageTypes.ts";
 
 export const AP_GEM_COLOR = 0x2f7fd0;
@@ -27,7 +27,12 @@ export interface CardFaceData {
   cost?: number | null; // AP cost, drawn as a gem in the corner
   costShort?: boolean; // not enough AP left for it: the gem turns red
   description?: string | null;
+  priority?: number | null; // strike priority, drawn as a badge atop the description
 }
+
+// The priority badge's colors: amber, so it reads apart from the ivory text.
+export const PRIORITY_BADGE_COLOR = 0xffb020;
+const PRIORITY_TEXT_COLOR = "#2a1600";
 
 // Face data for a card instance (hand, arena slot, commit flight).
 export function cardFaceData(card: Card): CardFaceData {
@@ -38,7 +43,8 @@ export function cardFaceData(card: Card): CardFaceData {
     damageType: "damageType" in card ? card.damageType : null,
     element: card.element ?? null,
     cost: cardCost(card),
-    description: describeCard(card),
+    description: describeCard(card, { priority: false }),
+    priority: cardPriority(card),
   };
 }
 
@@ -46,7 +52,7 @@ export function cardFaceData(card: Card): CardFaceData {
 // the gold ultimate card.
 export function actionFace(action: PlayRecord, ultimateName: string): CardFaceData {
   if (action.kind === "ultimate") {
-    return { category: "ultimate", name: ultimateName, description: `${action.damage ?? 0} damage` };
+    return { category: "ultimate", name: ultimateName, description: `${action.damage ?? 0} damage`, priority: action.priority ?? ULTIMATE_PRIORITY };
   }
   return {
     cardId: action.cardId,
@@ -56,6 +62,7 @@ export function actionFace(action: PlayRecord, ultimateName: string): CardFaceDa
     element: action.element ?? null,
     cost: action.cost ?? null,
     description: action.description,
+    priority: action.priority ?? null,
   };
 }
 
@@ -209,31 +216,61 @@ export function drawCardFace(
     )
   );
 
-  // Description, ivory on a dark box over the parchment.
-  if (card.description) {
+  // Description, ivory on a dark box over the parchment -- with the strike
+  // priority, if it has one, on an amber badge at the top center of the box.
+  const priority = card.priority ?? null;
+  if (card.description || priority !== null) {
     const box = slot(SLOT.text);
     const inset = 3 * scale;
     const panel = scene.add.graphics();
     panel.fillStyle(0x1a1a1a, 0.78);
     panel.fillRoundedRect(box.x, box.y, box.w, box.h, 4 * scale);
     container.add(panel);
-    container.add(
-      fit(
-        scene.add
-          .text(box.x + box.w / 2, box.y + box.h / 2, card.description, {
-            fontFamily: CARD_FONT.body,
-            fontSize: px(8.5 * scale),
-            fontStyle: "600",
-            color: "#fff8dc",
-            align: "center",
-            lineSpacing: -1 * scale,
-            wordWrap: { width: box.w - inset * 2 },
-          })
-          .setOrigin(0.5),
-        box.w - inset * 2,
-        box.h - inset * 2
-      )
-    );
+
+    let textTop = box.y;
+    if (priority !== null) {
+      const badgeH = 28 * sy;
+      const badgeY = box.y + inset;
+      const label = scene.add
+        .text(box.x + box.w / 2, badgeY + badgeH / 2, `PRIORITY ${priority}`, {
+          fontFamily: CARD_FONT.cost,
+          fontSize: px(badgeH * 0.78),
+          fontStyle: "900",
+          color: PRIORITY_TEXT_COLOR,
+          letterSpacing: 0.5 * scale,
+        })
+        .setOrigin(0.5);
+      fit(label, box.w * 0.7, badgeH);
+      const badgeW = label.displayWidth + 14 * sx;
+      const badge = scene.add.graphics();
+      badge.fillStyle(PRIORITY_BADGE_COLOR, 1);
+      badge.fillRoundedRect(box.x + (box.w - badgeW) / 2, badgeY, badgeW, badgeH, badgeH / 2);
+      badge.lineStyle(Math.max(1, scale), 0xffe7a8, 1);
+      badge.strokeRoundedRect(box.x + (box.w - badgeW) / 2, badgeY, badgeW, badgeH, badgeH / 2);
+      container.add([badge, label]);
+      textTop = badgeY + badgeH;
+    }
+
+    if (card.description) {
+      const textH = box.y + box.h - textTop;
+      container.add(
+        fit(
+          scene.add
+            .text(box.x + box.w / 2, textTop + textH / 2, card.description, {
+              fontFamily: CARD_FONT.body,
+              fontSize: px(8.5 * scale),
+              fontStyle: "600",
+              color: "#fff8dc",
+              align: "center",
+              lineSpacing: -1 * scale,
+              wordWrap: { width: box.w - inset * 2 },
+            })
+            .setOrigin(0.5),
+          box.w - inset * 2,
+          textH - inset * 2
+        )
+      );
+    }
   }
 
   return { container, bg };

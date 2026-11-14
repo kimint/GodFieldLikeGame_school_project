@@ -305,7 +305,7 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
         <aside className="deck-panel deck-detail">
           {selected ? (
             <>
-              <FramedCard card={selected} description={describeCard(asCard(selected))} />
+              <FramedCard card={selected} description={describeCard(asCard(selected), { priority: false })} />
               {selected.category === "monster" ? (
                 <p className="deck-detail-text">{describeMonsterOrders(asCard(selected))}</p>
               ) : null}
