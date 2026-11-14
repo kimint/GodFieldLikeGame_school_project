@@ -111,7 +111,6 @@ export function AuthScreen(): ReactElement {
               <input
                 type="email"
                 autoComplete="email"
-                autoFocus
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
