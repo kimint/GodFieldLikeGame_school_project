@@ -1053,31 +1053,39 @@ body {
   object-fit: cover;
 }
 
-/* Rarity: rare and legend cards get a glowing edge and a gem in the art
-   window's top-right corner, as on the battle screen (cardFace.ts). */
-.framed-card.rarity-rare { --rarity: #4aa3ff; }
-.framed-card.rarity-legend { --rarity: #ff9d1a; }
+/* Rarity: rare and legend cards get a thin border just inside the art
+   window and a gem at the left end of the name plate, as on the battle
+   screen (cardFace.ts) -- nothing outside the card, nothing over text. */
+.framed-card.rarity-rare { --rarity: #4aa3ff; --rarity-line: 2.36cqw; --gem: 4.6cqw; }
+.framed-card.rarity-legend { --rarity: #ff9d1a; --rarity-line: 3.14cqw; --gem: 5.2cqw; }
 
-.framed-card.rarity-rare,
-.framed-card.rarity-legend {
-  border-radius: 3cqw;
-  box-shadow: 0 0 0 0.6cqw var(--rarity), 0 0 4cqw var(--rarity);
+.framed-card-rarity-frame {
+  z-index: 1;
+  left: 7.85%;
+  top: 12.89%;
+  width: 82.2%;
+  height: 54.69%;
+  border: var(--rarity-line) solid var(--rarity);
+  pointer-events: none;
 }
 
 .framed-card-gem {
   z-index: 1;
-  right: 12%;
-  top: 17%;
-  width: 4.6cqw;
-  height: 4.6cqw;
-  transform: rotate(45deg) scaleX(0.85);
+  left: calc(6.28% + 1.8cqw + var(--gem) / 2);
+  top: 7.52%;
+  width: var(--gem);
+  height: var(--gem);
+  transform: translate(-50%, -50%) rotate(45deg) scaleX(0.85);
   background: linear-gradient(135deg, #ffffff 0 22%, var(--rarity) 23%);
-  border: 0.5cqw solid #1a1a1a;
+  border: 0.45cqw solid #1a1a1a;
 }
 
-.framed-card.rarity-legend .framed-card-gem {
-  width: 5.4cqw;
-  height: 5.4cqw;
+/* Room for the gem: the name shifts right and, for long names, shrinks a
+   little so it still fits the plate. */
+.framed-card.rarity-rare .framed-card-name,
+.framed-card.rarity-legend .framed-card-name {
+  padding-left: calc(var(--gem) + 2.6cqw);
+  font-size: 5cqw;
 }
 
 .framed-card-art.fallback { opacity: 0.35; }

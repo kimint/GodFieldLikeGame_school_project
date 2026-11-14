@@ -28,7 +28,7 @@ export interface CardFaceData {
   costShort?: boolean; // not enough AP left for it: the gem turns red
   description?: string | null;
   priority?: number | null; // strike priority, drawn as a badge atop the description
-  rarity?: Rarity | null; // rare / legend: a colored edge and a gem on the art window
+  rarity?: Rarity | null; // rare / legend: a border inside the art window and a gem on the name plate
 }
 
 // Rarity colors (normal cards draw neither the edge nor the gem).
@@ -158,21 +158,27 @@ export function drawCardFace(
     }
   }
 
-  // Rare and legend cards: a glowing edge in the rarity's color, and a gem
-  // in the art window's top-right corner (the element dot has the left).
+  // Rare and legend cards: a thin border in the rarity's color just inside
+  // the art window, and a gem at the left end of the name plate. Both stay
+  // inside the card (nothing bleeds onto neighbouring cards or the selection
+  // outline) and off the text.
   const rarity = card.rarity ?? RARITY.NORMAL;
+  const title = slot(SLOT.title);
+  let titleInset = 0; // room the gem takes at the left of the name plate
   if (rarity !== RARITY.NORMAL) {
     const rc = RARITY_COLOR[rarity];
+    // Border width in the frame image's pixels (9 rare, 12 legend), so it
+    // keeps the same share of the card at every size.
+    const lw = Math.max(2, (rarity === RARITY.LEGEND ? 12 : 9) * sx);
     const edge = scene.add.graphics();
-    edge.lineStyle(6 * scale, rc, 0.3);
-    edge.strokeRoundedRect(0, 0, w, h, 10 * scale);
-    edge.lineStyle(2 * scale, rc, 1);
-    edge.strokeRoundedRect(1 * scale, 1 * scale, w - 2 * scale, h - 2 * scale, 10 * scale);
+    edge.lineStyle(lw, rc, 1);
+    edge.strokeRect(art.x + lw / 2, art.y + lw / 2, art.w - lw, art.h - lw);
     container.add(edge);
 
-    const gx = art.x + art.w - 10 * scale;
-    const gy = art.y + 10 * scale;
-    const gr = (rarity === RARITY.LEGEND ? 7 : 6) * scale;
+    const gr = title.h * (rarity === RARITY.LEGEND ? 0.4 : 0.36);
+    const gx = title.x + 5 * sx + gr * 0.8;
+    const gy = title.y + title.h / 2;
+    titleInset = 5 * sx + gr * 1.6 + 3 * sx;
     const gem = scene.add.graphics();
     gem.fillStyle(rc, 1);
     gem.lineStyle(Math.max(1, 1.5 * scale), 0x1a1a1a, 1);
@@ -194,12 +200,13 @@ export function drawCardFace(
     container.add(scene.add.circle(art.x + 9 * scale, art.y + 9 * scale, 5 * scale, accent).setStrokeStyle(1.5, COLORS.background));
   }
 
-  // Name, on the plate: gold caps with a dark bronze edge and a drop shadow.
-  const title = slot(SLOT.title);
+  // Name, on the plate: gold caps with a dark bronze edge and a drop shadow
+  // (moved right of the rarity gem, if there is one).
+  const nameW = title.w - titleInset;
   container.add(
     fit(
       scene.add
-        .text(title.x + title.w / 2, title.y + title.h / 2, (card.name ?? "").toUpperCase(), {
+        .text(title.x + titleInset + nameW / 2, title.y + title.h / 2, (card.name ?? "").toUpperCase(), {
           fontFamily: CARD_FONT.title,
           fontSize: px(Math.max(title.h * 0.62, 8 * scale)),
           fontStyle: "700",
@@ -209,7 +216,7 @@ export function drawCardFace(
         })
         .setShadow(0, Math.max(1, scale), "#000000", 2 * scale, true, true)
         .setOrigin(0.5),
-      title.w - 6 * sx,
+      nameW - 6 * sx,
       title.h * 1.3
     )
   );

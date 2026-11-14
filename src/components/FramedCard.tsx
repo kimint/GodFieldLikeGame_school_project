@@ -20,13 +20,14 @@ export function FramedCard({ card, description }: FramedCardProps): ReactElement
   const rarity = cardRarity(card.props);
   return (
     <div className={`framed-card ${card.category} rarity-${rarity}`} title={`${RARITY_LABEL[rarity]} card`}>
-      {rarity !== "normal" && <span className="framed-card-gem" aria-label={RARITY_LABEL[rarity]} />}
       {card.imageUrl ? (
         <img className="framed-card-art" src={card.imageUrl} alt={`${card.name} artwork`} loading="lazy" draggable={false} />
       ) : (
         <div className="framed-card-art fallback" />
       )}
+      {rarity !== "normal" && <span className="framed-card-rarity-frame" />}
       <div className="framed-card-name">{card.name}</div>
+      {rarity !== "normal" && <span className="framed-card-gem" aria-label={RARITY_LABEL[rarity]} />}
       <div className="framed-card-cost">{cardCost(card.props)}</div>
       <div className="framed-card-category">{card.category}</div>
       <div className={`framed-card-text${priority !== null ? " has-priority" : ""}`}>
