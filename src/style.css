@@ -1239,7 +1239,7 @@ body {
 
 .title-screen {
   --title-gold: #d9be84;
-  --title-serif: "Cinzel", "Cormorant Garamond", Georgia, "DejaVu Serif", serif;
+  --title-font: "Jost", "Inter", "Helvetica Neue", Arial, sans-serif;
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -1356,8 +1356,8 @@ body {
   right: 0;
   bottom: 6vh;
   text-align: center;
-  font: 400 13px/1 var(--title-serif);
-  letter-spacing: 0.42em;
+  font: 300 15px/1 var(--title-font);
+  letter-spacing: 0.32em;
   text-transform: uppercase;
   color: var(--title-gold);
   text-shadow: 0 0 10px rgba(230, 190, 110, 0.5);
@@ -1482,9 +1482,8 @@ body {
   margin-bottom: -1px;
   background: none;
   cursor: pointer;
-  font: 700 13px/1 var(--title-serif);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  font: 400 16px/1 var(--title-font);
+  letter-spacing: 0.06em;
   color: #7f8696;
   transition: color 0.25s ease, border-color 0.25s ease;
 }
@@ -1507,8 +1506,8 @@ body {
 .title-field span {
   display: block;
   margin-bottom: 7px;
-  font: 400 11px/1 var(--title-serif);
-  letter-spacing: 0.22em;
+  font: 400 12px/1 var(--title-font);
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: rgba(217, 190, 132, 0.75);
 }
@@ -1539,9 +1538,8 @@ body {
   margin-top: 24px;
   border-radius: 10px;
   cursor: pointer;
-  font: 700 14px/1 var(--title-serif);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font: 500 16px/1 var(--title-font);
+  letter-spacing: 0.08em;
   color: #f3e2b8;
   border: 1px solid var(--title-gold);
   background: linear-gradient(to bottom, rgba(70, 55, 30, 0.6), rgba(20, 16, 12, 0.7));
