@@ -42,8 +42,8 @@ export const TEXT: { body: string; muted: string; white: string } = {
 // scenes can keep their original values while the board moves to the
 // preview's warmer, more translucent look.
 export const UI_COLORS = {
-  panel: 0x121315,
-  panelAlpha: 0.82,
+  panel: 0x111216,
+  panelAlpha: 0.95,
   edge: 0x3a3529,
   bronze: 0xa8842f,
   bronzeHi: 0xd8b95c,
@@ -62,6 +62,13 @@ export const UI_COLORS = {
 
 export const FONT_UI = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
 export const FONT_DISPLAY = "Cinzel, 'Trajan Pro', Georgia, serif";
+// Numbers (stat values, HP, AP), as in the lobby.
+export const FONT_NUM = "Outfit, Inter, system-ui, sans-serif";
+// The Zenkake wordmark (thin geometric sans, as on the title screen / lobby).
+export const FONT_BRAND = "Jost, Outfit, system-ui, sans-serif";
+// Lobby gold: hairlines, titles, the tutorial highlight.
+export const GOLD = 0xe2c588;
+export const GOLD_CSS = "#e2c588";
 // Legacy alias: most battle text is UI text.
 export const FONT_FAMILY = FONT_UI;
 
@@ -125,6 +132,63 @@ export function preloadBackground(scene: Phaser.Scene, bg: BackgroundDef): void 
 export function addBackground(scene: Phaser.Scene, bg: BackgroundDef): Phaser.GameObjects.Image | null {
   if (!scene.textures.exists(bg.key)) return null;
   return scene.add.image(0, 0, bg.key).setOrigin(0, 0).setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
+}
+
+// The background pushed back behind the UI: blurred, dimmed and
+// vignetted, so it reads as atmosphere and the cards and panels on top of it
+// stay crisp. Built once per texture into a canvas texture (a cheap
+// down/up-sample blur, so it works on every browser and renderer).
+export function addSoftBackground(
+  scene: Phaser.Scene,
+  bg: BackgroundDef,
+  { blur = 7, dim = 0.4, vignette = 0.72 }: { blur?: number; dim?: number; vignette?: number } = {}
+): Phaser.GameObjects.Image | null {
+  if (!scene.textures.exists(bg.key)) return null;
+  const key = `${bg.key}-soft`;
+  if (!scene.textures.exists(key)) {
+    const src = scene.textures.get(bg.key).getSourceImage() as CanvasImageSource & { width: number; height: number };
+    const W = src.width;
+    const H = src.height;
+    const texture = scene.textures.createCanvas(key, W, H);
+    if (!texture) return addBackground(scene, bg);
+    const ctx = texture.getContext();
+    // Blur: shrink by ~blur layout px per sample, then scale back up in two
+    // smoothed steps. Drawn slightly oversized so the edges don't go soft.
+    const k = Math.max(2, Math.round((blur * W) / GAME_WIDTH));
+    const small = document.createElement("canvas");
+    small.width = Math.max(1, Math.round(W / k));
+    small.height = Math.max(1, Math.round(H / k));
+    const sctx = small.getContext("2d") as CanvasRenderingContext2D;
+    sctx.imageSmoothingQuality = "high";
+    sctx.drawImage(src, 0, 0, small.width, small.height);
+    const mid = document.createElement("canvas");
+    mid.width = small.width * 2;
+    mid.height = small.height * 2;
+    const mctx = mid.getContext("2d") as CanvasRenderingContext2D;
+    mctx.imageSmoothingQuality = "high";
+    mctx.drawImage(small, 0, 0, mid.width, mid.height);
+    ctx.imageSmoothingQuality = "high";
+    const bleed = 0.02;
+    ctx.drawImage(mid, -W * bleed, -H * bleed, W * (1 + bleed * 2), H * (1 + bleed * 2));
+    // Tone down, a touch cooler than black so it doesn't go muddy.
+    ctx.fillStyle = `rgba(6, 7, 10, ${dim})`;
+    ctx.fillRect(0, 0, W, H);
+    // Vignette: clear in the middle, dark at the edges and corners.
+    const v = ctx.createRadialGradient(W / 2, H * 0.52, Math.min(W, H) * 0.22, W / 2, H * 0.52, Math.hypot(W, H) * 0.56);
+    v.addColorStop(0, "rgba(4, 5, 7, 0)");
+    v.addColorStop(0.55, `rgba(4, 5, 7, ${vignette * 0.35})`);
+    v.addColorStop(1, `rgba(4, 5, 7, ${vignette})`);
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, W, H);
+    // A darker band under the HUD rows at the top.
+    const top = ctx.createLinearGradient(0, 0, 0, H * 0.3);
+    top.addColorStop(0, "rgba(4, 5, 7, 0.55)");
+    top.addColorStop(1, "rgba(4, 5, 7, 0)");
+    ctx.fillStyle = top;
+    ctx.fillRect(0, 0, W, H * 0.3);
+    texture.refresh();
+  }
+  return scene.add.image(0, 0, key).setOrigin(0, 0).setDisplaySize(GAME_WIDTH, GAME_HEIGHT);
 }
 
 // A soft drop shadow for text drawn straight on a background illustration.

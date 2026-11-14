@@ -3,6 +3,7 @@ import type { ClassDef } from "../model/classes.ts";
 import type { StatKey } from "../model/stats.ts";
 import { DECK_RULES, deckSize, starterDeckList } from "../model/decks.ts";
 import { cardIconMarkup, classIconMarkup, ultimateIconMarkup } from "../icons.ts";
+import { STAT_STYLE } from "../statIcons.ts";
 import { onlineAvailable } from "../online/supabaseClient.ts";
 import type { Account } from "../online/authApi.ts";
 import type { SavedDeck } from "../online/decksApi.ts";
@@ -27,44 +28,11 @@ export interface ClassSelectProps {
 }
 
 // The five stats shown in the inspector, in display order, each with its own
-// icon (24x24 inner SVG) and colour so the shape of a class reads at a glance.
-const STAT_ROWS: { key: StatKey; label: string; name: string; color: string; icon: string }[] = [
-  {
-    key: "hp",
-    label: "HP",
-    name: "Health",
-    color: "#ef5b63",
-    icon: '<path d="M12 21 C5 15.5 2.5 12.3 2.5 8.6 A4.9 4.9 0 0 1 12 6.4 A4.9 4.9 0 0 1 21.5 8.6 C21.5 12.3 19 15.5 12 21 Z" fill="currentColor"/>',
-  },
-  {
-    key: "def",
-    label: "DEF",
-    name: "Physical defense",
-    color: "#8fb3e0",
-    icon: '<path d="M12 2 L20 5 V11 C20 16 16.5 20 12 22 C7.5 20 4 16 4 11 V5 Z" fill="currentColor"/><path d="M12 5.5 V18.5" stroke="#0b0d13" stroke-width="1.6"/>',
-  },
-  {
-    key: "mr",
-    label: "MR",
-    name: "Magic resist",
-    color: "#5fdbe6",
-    icon: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 5 L17 15 H7 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/>',
-  },
-  {
-    key: "er",
-    label: "ER",
-    name: "Element resist",
-    color: "#f2c95c",
-    icon: '<path d="M13.5 2 L5 13.5 H11 L10 22 L19 10 H13 Z" fill="currentColor"/>',
-  },
-  {
-    key: "ur",
-    label: "UR",
-    name: "Ultimate regen",
-    color: "#ffb347",
-    icon: '<path d="M12 2 C13 6 17.5 8 17.5 13.5 A5.5 5.5 0 0 1 6.5 13.5 C6.5 10.5 8.5 9 9.5 6.5 C10.5 9 11.5 9.5 12 2 Z" fill="currentColor"/><path d="M12 12.5 C13 14 14.2 14.8 14.2 16.4 A2.2 2.2 0 0 1 9.8 16.4 C9.8 15 11 14 12 12.5 Z" fill="#0b0d13"/>',
-  },
-];
+// icon and colour (shared with the battle HUD, src/statIcons.ts) so the shape
+// of a class reads at a glance.
+const STAT_ROWS: { key: StatKey; label: string; name: string; color: string; icon: string }[] = (
+  ["hp", "def", "mr", "er", "ur"] as const
+).map((key) => ({ key, ...STAT_STYLE[key] }));
 
 // Accent colour per class; unknown classes fall back to gold.
 const CLASS_ACCENT: Record<string, string> = {

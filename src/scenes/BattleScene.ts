@@ -42,8 +42,17 @@ import type { StatKey } from "../model/stats.ts";
 import { cardCost, type Card, type DefendCard } from "../model/cardTypes.ts";
 import type { ClassDef } from "../model/classes.ts";
 import { allCards, allClasses } from "../model/catalog.ts";
-import { preloadIcons, classIconKey, ULTIMATE_ICON_KEY, CARD_ICON_KEY, SETTINGS_ICON_KEY } from "../phaserIcons.ts";
+import {
+  preloadIcons,
+  classIconKey,
+  statIconKey,
+  ULTIMATE_ICON_KEY,
+  CARD_ICON_KEY,
+  SETTINGS_ICON_KEY,
+  BRAND_EMBLEM_KEY,
+} from "../phaserIcons.ts";
 import { loadCardArt, loadedArtKey } from "../cardArt.ts";
+import { STAT_STYLE, isStyledStat } from "../statIcons.ts";
 import { getVolume, playSfx, setVolume } from "../fx/sound.ts";
 import {
   COLORS,
@@ -51,10 +60,14 @@ import {
   UI_COLORS,
   FONT_FAMILY,
   FONT_DISPLAY,
+  FONT_NUM,
+  FONT_BRAND,
+  GOLD,
+  GOLD_CSS,
   BACKGROUNDS,
   GAME_WIDTH,
   GAME_HEIGHT,
-  addBackground,
+  addSoftBackground,
   preloadBackground,
   createButton,
   createCircleButton,
@@ -72,53 +85,57 @@ import { playRoundRecap, setRecapSpeed, type RecapPanel, type RecapSide, type Ro
 // the two arena slots and is where the round recap plays.
 const STRIP_X = 16;
 const STRIP_W = 980;
-const STRIP_H = 94;
+const STRIP_H = 100;
 const STRIP_PAD = 14;
-// Stat rail: one recessed channel under the header, 30px tall. The chips row
-// below it keeps the synergy/status chips + ultimate meter.
-const RAIL_Y = 28;
-const RAIL_H = 30;
-const CHIP_ROW_Y = 64;
-const CPU_STRIP_Y = 52;
-const PLAYER_STRIP_Y = 424;
-const STATUS_Y = 160;
+// Stat row: five icon + number badges under the header (the lobby's stat
+// tiles, shrunk). The chips row below keeps the synergy/status chips +
+// ultimate meter.
+const RAIL_Y = 32;
+const RAIL_H = 34;
+const RAIL_GAP = 8;
+const CHIP_ROW_Y = 73;
+const CPU_STRIP_Y = 50;
+const PLAYER_STRIP_Y = 410;
+const STATUS_Y = 157;
 const PLAYER_STRIP_X = STRIP_X;
 const PLAYER_STRIP_W = STRIP_W;
 
-const HAND_Y = 539;
-const CARD_W = 123;
-const CARD_H = 165;
+// Hand cards are vector-drawn (cardFace.ts) at 143x192, ~16% bigger than
+// the old 123x165 bitmap-framed cards.
+const HAND_Y = 518;
+const CARD_W = 143;
+const CARD_H = 192;
 
 // The hand (docs "Card Position"): cards fanned out from the bottom center;
 // hover expands a card; a click moves it to the middle of the screen in full
 // view (at most a third of the screen tall, with space above and below);
 // clicking it again plays it onto your side of the arena, clicking anywhere
 // else puts it back.
-const FAN_OVERLAP = 13;
+const FAN_OVERLAP = 12;
 
 // Your class badge, under the player strip and left of the hand: icon + name,
 // ringed by a yellow gauge for the ultimate meter. Once it's full the badge
 // glows and pulses, and clicking it toggles the ultimate for this turn.
-const CLASS_BADGE = { x: 16, y: 528, w: 208, h: 176 };
+const CLASS_BADGE = { x: 16, y: 518, w: 184, h: 192 };
 const BADGE_RADIUS = 10;
 const ULT_RING_W = 5;
 const ULT_RING_LIVE = 0xffd23f;
 
 // The End turn bar sits under the log, in the right column. One pip per AP:
 // lit = AP left, pulsing = about to be spent, dark = spent on this turn.
-const END_TURN = { x: 1008, y: 640, w: 256, h: 64 };
+const END_TURN = { x: 1008, y: 644, w: 256, h: 66 };
 const AP_RING_LIVE = 0xffd23f;
 const AP_RING_SPENT = 0x3a3220;
 const HOVER_LIFT = 14;
 const HOVER_SCALE = 1.12;
-const PREVIEW_SCALE = 1.45; // 165px card -> 239px, under a third of 720
-const PREVIEW_RING = 0xc49b3a;
-const STAGE_SCALE = 0.9; // picked cards, on the player's slot
+const PREVIEW_SCALE = 1.4; // 192px card -> 269px
+const PREVIEW_RING = 0xe2c588;
+const STAGE_SCALE = 0.88; // picked cards, on the player's slot
 
 // Middle play zone: slots centered between the two monster fields.
-const SLOT_W = 132;
-const SLOT_H = 176;
-const SLOT_Y = 200;
+const SLOT_W = 150;
+const SLOT_H = 186;
+const SLOT_Y = 198;
 const SLOT_GAP = 18;
 const SLOT_TOTAL_W = SLOT_W * 2 + SLOT_GAP;
 
@@ -126,7 +143,7 @@ const SLOT_TOTAL_W = SLOT_W * 2 + SLOT_GAP;
 // right. Sized to the preview's 3-socket plates.
 const FIELD_W = 234;
 const FIELD_Y = 152;
-const FIELD_H = 264;
+const FIELD_H = 252;
 const CPU_FIELD_X = 16;
 const PLAYER_FIELD_X = 762;
 const PLAY_ZONE_X = CPU_FIELD_X + FIELD_W;
@@ -154,7 +171,7 @@ export interface PendingTurn {
   round: number; // battle.round at commit
 }
 
-const LOG_BOX = { x: 1008, y: 52, w: 256, h: 576 };
+const LOG_BOX = { x: 1008, y: 50, w: 256, h: 584 };
 const LOG_HEAD_H = 32;
 const LOG_FOOT_H = 22;
 const LOG_X = LOG_BOX.x;
@@ -173,13 +190,10 @@ const LOG_ENTRY_GAP = 6;
 // The band the round recap covers: the central play zone.
 const RECAP_STAGE = { y: FIELD_Y, h: FIELD_H };
 
-const STAT_CHIPS: Array<{ key: StatKey; label: string; color: number }> = [
-  { key: "def", label: "DEF", color: 0xc9c9c9 },
-  { key: "mr", label: "MR", color: 0xb388ff },
-  { key: "er", label: "ER", color: 0xff9d4d },
-  { key: "ur", label: "UR", color: 0xffe066 },
-  { key: "atk", label: "ATK", color: 0xff6b5f },
-];
+// Colours and icons match the lobby's stat tiles (src/statIcons.ts).
+const STAT_CHIPS: Array<{ key: StatKey; label: string; color: number }> = (["def", "mr", "er", "ur", "atk"] as const).map(
+  (key) => ({ key, label: STAT_STYLE[key].label, color: parseInt(STAT_STYLE[key].color.slice(1), 16) })
+);
 
 // Full names and explanations for the stat chips (hover / click).
 const STAT_INFO: Record<StatKey, { label: string; name: string; description: string }> = {
@@ -468,9 +482,9 @@ export class BattleScene extends Phaser.Scene {
       texture.refresh();
     }
     for (const { x, y } of TORCHES) {
-      const glow = this.add.image(x, y - 16, TORCH_GLOW_KEY).setDisplaySize(190, 190).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5);
+      const glow = this.add.image(x, y - 16, TORCH_GLOW_KEY).setDisplaySize(210, 210).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.3);
       // Alpha and size flicker on unrelated periods, so it never looks regular.
-      this.tweens.add({ targets: glow, alpha: 0.28, duration: 150 + Math.random() * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.tweens.add({ targets: glow, alpha: 0.18, duration: 150 + Math.random() * 90, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
       this.tweens.add({
         targets: glow,
         scale: glow.scale * 0.9,
@@ -481,6 +495,32 @@ export class BattleScene extends Phaser.Scene {
         delay: Math.random() * 100,
       });
     }
+  }
+
+  // The Zenkake wordmark, centered in the top bar: the emblem and gold
+  // letter-spaced caps, as in the lobby header.
+  drawBrand(): void {
+    const word = this.add
+      .text(0, 0, "ZENKAKE", {
+        fontFamily: FONT_BRAND,
+        fontSize: "17px",
+        fontStyle: "400",
+        color: GOLD_CSS,
+      })
+      .setLetterSpacing(6.5)
+      .setOrigin(0, 0.5);
+    // Letter spacing trails the last letter; leave it out of the centering.
+    const wordW = word.width - 6.5;
+    const mark = 30;
+    const gap = 10;
+    const hasMark = this.textures.exists(BRAND_EMBLEM_KEY);
+    const total = wordW + (hasMark ? mark + gap : 0);
+    const x0 = GAME_WIDTH / 2 - total / 2;
+    if (hasMark) {
+      this.add.image(x0 + mark / 2, 21, BRAND_EMBLEM_KEY).setDisplaySize(mark, mark);
+    }
+    word.setPosition(x0 + (hasMark ? mark + gap : 0), 21.5);
+    word.setShadow(0, 0, "rgba(226, 197, 136, 0.45)", 8, false, true);
   }
 
   // --- battle source (overridden by RandomBattleScene) ---------------------
@@ -612,9 +652,9 @@ export class BattleScene extends Phaser.Scene {
 
     this.statusRoundBg.clear();
     this.statusRoundBg.fillStyle(0x1a160b, 0.92);
-    this.statusRoundBg.fillRoundedRect(0, -10, pillW, 20, 10);
-    this.statusRoundBg.lineStyle(1, UI_COLORS.bronze, 0.4);
-    this.statusRoundBg.strokeRoundedRect(0.5, -9.5, pillW - 1, 19, 10);
+    this.statusRoundBg.fillRoundedRect(0, -12, pillW, 24, 12);
+    this.statusRoundBg.lineStyle(1, GOLD, 0.55);
+    this.statusRoundBg.strokeRoundedRect(0.5, -11.5, pillW - 1, 23, 12);
     this.statusRoundPill.setVisible(true);
 
     const maxHint = PLAY_ZONE_W - pillW - 18;
@@ -623,7 +663,7 @@ export class BattleScene extends Phaser.Scene {
     const hintW = Math.min(this.statusText.width, maxHint);
     const total = pillW + 8 + hintW;
     const startX = Phaser.Math.Clamp(PLAY_ZONE_CX - total / 2, PLAY_ZONE_X + 4, PLAYER_FIELD_X - total - 4);
-    this.statusRoundPill.setPosition(startX, STATUS_Y + 10);
+    this.statusRoundPill.setPosition(startX, STATUS_Y + 11);
     this.statusText.setPosition(startX + pillW + 8, STATUS_Y + 3);
   }
 
@@ -700,15 +740,17 @@ export class BattleScene extends Phaser.Scene {
       this.dismissPreview();
     });
 
-    addBackground(this, BACKGROUNDS.battle);
+    // The hall is pushed back (blurred, dimmed, vignetted) so the board in
+    // front of it reads cleanly.
+    addSoftBackground(this, BACKGROUNDS.battle);
     this.addTorchLight();
 
     // Top bar: unifies the settings gear, replay speed, title and log column.
     const topbar = this.add.graphics();
-    topbar.fillGradientStyle(0x08090b, 0x08090b, 0x08090b, 0x08090b, 0.94, 0.94, 0.55, 0.55);
-    topbar.fillRect(0, 0, GAME_WIDTH, 44);
-    topbar.lineStyle(1, UI_COLORS.bronze, 0.18);
-    topbar.lineBetween(0, 43.5, GAME_WIDTH, 43.5);
+    topbar.fillGradientStyle(0x08090b, 0x08090b, 0x08090b, 0x08090b, 0.97, 0.97, 0.86, 0.86);
+    topbar.fillRect(0, 0, GAME_WIDTH, 42);
+    topbar.lineStyle(1, GOLD, 0.24);
+    topbar.lineBetween(0, 41.5, GAME_WIDTH, 41.5);
 
     // Dark backing so the battle log reads cleanly over the hall's floor.
     // The log's pieces keep their screen coordinates inside logPanel, which
@@ -716,23 +758,13 @@ export class BattleScene extends Phaser.Scene {
     this.logHidden = readLogHidden();
     this.logPanel = this.add.container(this.logHidden ? LOG_HIDE_DX : 0, 0);
     const logBacking = this.add.graphics();
-    logBacking.fillStyle(0x0a0b0c, 0.88);
+    logBacking.fillStyle(UI_COLORS.panel, UI_COLORS.panelAlpha);
     logBacking.fillRoundedRect(LOG_BOX.x, LOG_BOX.y, LOG_BOX.w, LOG_BOX.h, 10);
     logBacking.lineStyle(1, UI_COLORS.edge, 0.95);
     logBacking.strokeRoundedRect(LOG_BOX.x + 0.5, LOG_BOX.y + 0.5, LOG_BOX.w - 1, LOG_BOX.h - 1, 10);
     this.logPanel.add(logBacking);
 
-    textShadow(
-      this.add
-        .text(GAME_WIDTH / 2, 9, "GODFIELD-LITE", {
-          fontFamily: FONT_DISPLAY,
-          fontSize: "14px",
-          fontStyle: "700",
-          color: UI_COLORS.ivory,
-        })
-        .setOrigin(0.5, 0)
-        .setLetterSpacing(2)
-    );
+    this.drawBrand();
 
     // Top-left, clear of the centered title and the right-side log column:
     // the settings gear (volume, account, replay speed), above the menu it
@@ -780,11 +812,11 @@ export class BattleScene extends Phaser.Scene {
     this.statusRoundText = this.add
       .text(10, 0, "", {
         fontFamily: FONT_DISPLAY,
-        fontSize: "9.5px",
+        fontSize: "12px",
         fontStyle: "700",
-        color: UI_COLORS.goldHi,
+        color: GOLD_CSS,
       })
-      .setLetterSpacing(1.4)
+      .setLetterSpacing(1.6)
       .setOrigin(0, 0.5);
     this.statusRoundPill = this.add
       .container(0, 0, [this.statusRoundBg, this.statusRoundText])
@@ -794,9 +826,9 @@ export class BattleScene extends Phaser.Scene {
       this.add
         .text(PLAY_ZONE_CX, STATUS_Y + 3, "", {
           fontFamily: FONT_FAMILY,
-          fontSize: "10.5px",
-          fontStyle: "500",
-          color: UI_COLORS.body,
+          fontSize: "13px",
+          fontStyle: "600",
+          color: "#e6e8ec",
           align: "left",
           wordWrap: { width: PLAY_ZONE_W - 20 },
           lineSpacing: 1,
@@ -912,7 +944,7 @@ export class BattleScene extends Phaser.Scene {
     this.render();
     loadCardArt(this, allCards(), () => this.render());
     // Text is drawn once, so redraw when the card fonts (index.html) arrive.
-    Promise.all(["700 16px Cinzel", '900 16px "Exo 2"', "400 16px Inter", "500 16px Inter", "600 16px Inter", "700 16px Inter", "800 16px Inter"].map((font) => document.fonts.load(font)))
+    Promise.all(["700 16px Cinzel", "500 16px Outfit", "600 16px Outfit", "700 16px Outfit", "400 16px Jost", "400 16px Inter", "500 16px Inter", "600 16px Inter", "700 16px Inter", "800 16px Inter"].map((font) => document.fonts.load(font)))
       .then(() => this.sys.isActive() && this.render())
       .catch(() => {});
   }
@@ -1338,7 +1370,7 @@ export class BattleScene extends Phaser.Scene {
       this.drawEffectChips(container, fighter, w, CHIP_ROW_Y, w - STRIP_PAD);
     } else {
       this.drawEffectChips(container, fighter, w, CHIP_ROW_Y, w * 0.55);
-      this.drawUltimateMeter(container, fighter, w * 0.58, CHIP_ROW_Y + 6, w - w * 0.58 - STRIP_PAD);
+      this.drawUltimateMeter(container, fighter, w * 0.58, CHIP_ROW_Y + 10.5, w - w * 0.58 - STRIP_PAD);
     }
 
     this.panelViews[key] = { x, y, w, h: STRIP_H, container, setHp };
@@ -1352,46 +1384,51 @@ export class BattleScene extends Phaser.Scene {
     key: "player" | "cpu"
   ): { left: number; right: number } {
     const side = this.add
-      .text(STRIP_PAD, 9, key === "cpu" ? "CPU" : "PLAYER", {
+      .text(STRIP_PAD, 16, key === "cpu" ? "CPU" : "YOU", {
         fontFamily: FONT_FAMILY,
-        fontSize: "8px",
-        fontStyle: "600",
-        color: UI_COLORS.faint,
+        fontSize: "10px",
+        fontStyle: "700",
+        color: UI_COLORS.muted,
       })
-      .setLetterSpacing(1.6);
+      .setLetterSpacing(1.6)
+      .setOrigin(0, 0.5);
     container.add(side);
 
-    const name = this.add.text(STRIP_PAD + side.width + 9, 4, this.displayName(fighter), {
-      fontFamily: FONT_DISPLAY,
-      fontSize: "15px",
-      fontStyle: "700",
-      color: UI_COLORS.ivory,
-    });
+    const name = this.add
+      .text(STRIP_PAD + side.width + 9, 16, this.displayName(fighter), {
+        fontFamily: FONT_DISPLAY,
+        fontSize: "18px",
+        fontStyle: "700",
+        color: UI_COLORS.ivory,
+      })
+      .setOrigin(0, 0.5);
     container.add(name);
 
     // AP pill beside the name: left this turn / this turn's max (for you,
     // after the cards picked so far).
     const apText = this.add
-      .text(0, 0, `AP ${fmt(fighter === this.battle.player && !this.pendingTurn ? this.plannedAp() : fighter.ap)}/${fighter.maxAp ?? fighter.ap}`, { fontFamily: FONT_FAMILY, fontSize: "10px", fontStyle: "700", color: TEXT.white })
+      .text(0, 0, `AP ${fmt(fighter === this.battle.player && !this.pendingTurn ? this.plannedAp() : fighter.ap)}/${fighter.maxAp ?? fighter.ap}`, { fontFamily: FONT_NUM, fontSize: "13px", fontStyle: "700", color: TEXT.white })
       .setOrigin(0, 0.5);
-    const pillX = STRIP_PAD + side.width + name.width + 18;
-    const pillW = apText.width + 16;
+    const pillX = STRIP_PAD + side.width + name.width + 20;
+    const pillW = apText.width + 18;
     const pill = this.add.graphics();
     pill.fillStyle(AP_GEM_COLOR, 1);
-    pill.fillRoundedRect(pillX, 5, pillW, 18, 9);
-    apText.setPosition(pillX + 8, 14);
+    pill.fillRoundedRect(pillX, 6, pillW, 21, 10.5);
+    pill.lineStyle(1, 0xbfe0ff, 0.7);
+    pill.strokeRoundedRect(pillX + 0.5, 6.5, pillW - 1, 20, 10);
+    apText.setPosition(pillX + 9, 16.5);
     container.add([pill, apText]);
 
     const handCount = fighter.handCount ?? fighter.hand.length;
     const hand = this.add
-      .text(w - STRIP_PAD, 9, `HAND ${handCount}`, {
-        fontFamily: FONT_FAMILY,
-        fontSize: "8px",
+      .text(w - STRIP_PAD, 16, `HAND ${handCount}`, {
+        fontFamily: FONT_NUM,
+        fontSize: "12px",
         fontStyle: "600",
-        color: UI_COLORS.faint,
+        color: UI_COLORS.body,
       })
       .setLetterSpacing(1.2)
-      .setOrigin(1, 0);
+      .setOrigin(1, 0.5);
     container.add(hand);
     return { left: pillX + pillW + 10, right: w - STRIP_PAD - hand.width - 12 };
   }
@@ -1413,16 +1450,16 @@ export class BattleScene extends Phaser.Scene {
     const text = this.add
       .text(0, 0, `GUARD ${guards.map(({ card }) => guardAmount(card as DefendCard)).join(" / ")}`, {
         fontFamily: FONT_FAMILY,
-        fontSize: "10.5px",
+        fontSize: "12px",
         fontStyle: "700",
         color: "#0b1b26",
       })
       .setOrigin(0, 0.5);
-    const iconSize = 13;
+    const iconSize = 14;
     const wBadge = text.width + iconSize + 20;
-    const h = 20;
+    const h = 21;
     const x = right - wBadge;
-    const y = 3;
+    const y = 6;
     const pill = this.add.graphics();
     pill.fillStyle(GUARD_COLOR, 1);
     pill.fillRoundedRect(x, y, wBadge, h, h / 2);
@@ -1447,32 +1484,34 @@ export class BattleScene extends Phaser.Scene {
   ): (next: number) => void {
     const pad = left;
     const barW = right - left;
-    const y = 7;
-    const h = 16;
+    const y = 6;
+    const h = 21;
     const track = this.add.graphics();
     track.fillStyle(UI_COLORS.railInk, 1);
-    track.fillRoundedRect(pad, y, barW, h, 8);
-    track.lineStyle(1, 0x000000, 0.55);
-    track.strokeRoundedRect(pad + 0.5, y + 0.5, barW - 1, h - 1, 8);
+    track.fillRoundedRect(pad, y, barW, h, h / 2);
+    track.lineStyle(1, GOLD, 0.22);
+    track.strokeRoundedRect(pad + 0.5, y + 0.5, barW - 1, h - 1, h / 2);
     const ghost = this.add.graphics();
     const fill = this.add.graphics();
     const hpLabel = this.add
-      .text(pad + 9, y + h / 2, "HP", {
-        fontFamily: FONT_FAMILY,
-        fontSize: "9.5px",
+      .text(pad + 10, y + h / 2, "HP", {
+        fontFamily: FONT_NUM,
+        fontSize: "12px",
         fontStyle: "700",
-        color: "rgba(255,255,255,0.85)",
+        color: "#ffffff",
+        stroke: "#000000",
+        strokeThickness: 2,
       })
       .setLetterSpacing(1.1)
       .setOrigin(0, 0.5);
     const value = this.add
       .text(pad + barW / 2, y + h / 2, "", {
-        fontFamily: FONT_FAMILY,
-        fontSize: "12px",
+        fontFamily: FONT_NUM,
+        fontSize: "15px",
         fontStyle: "700",
         color: TEXT.white,
         stroke: "#000000",
-        strokeThickness: 2,
+        strokeThickness: 3,
       })
       .setOrigin(0.5);
     container.add([track, ghost, fill, hpLabel, value]);
@@ -1482,7 +1521,7 @@ export class BattleScene extends Phaser.Scene {
       const bw = barW * Phaser.Math.Clamp(hp / fighter.maxHp, 0, 1);
       if (bw <= 0) return;
       g.fillStyle(color, alpha);
-      g.fillRoundedRect(pad, y, bw, h, Math.min(8, bw / 2));
+      g.fillRoundedRect(pad, y, bw, h, Math.min(h / 2, bw / 2));
     };
     const draw = (hp: number, ghostHp: number): void => {
       bar(ghost, ghostHp, 0xffffff, 0.35);
@@ -1505,16 +1544,17 @@ export class BattleScene extends Phaser.Scene {
     };
   }
 
-  // A single engraved stat rail: DEF / MR / ER / UR / ATK. Each cell keeps
-  // the old hover/click explainer, guard tint and change marker, so the data
-  // and interactions are unchanged -- only the five boxes are gone.
+  // The stat row: DEF / MR / ER / UR / ATK as five badges in the lobby's
+  // style -- stat icon, coloured label, big number -- on a tint of the
+  // stat's colour. Each keeps the hover/click explainer, the guard tint and
+  // the change marker.
   drawStatRail(container: Phaser.GameObjects.Container, fighter: Fighter, w: number): void {
     const pad = STRIP_PAD;
     const x = pad;
     const y = RAIL_Y;
     const h = RAIL_H;
     const railW = w - pad * 2;
-    const cw = railW / STAT_CHIPS.length;
+    const cw = (railW - RAIL_GAP * (STAT_CHIPS.length - 1)) / STAT_CHIPS.length;
     const stats = computeCurrentStats(fighter);
     const base = fighter.classDef.baseStats;
 
@@ -1525,149 +1565,115 @@ export class BattleScene extends Phaser.Scene {
       if (statKey) guardByStat[statKey] = card as DefendCard;
     }
 
-    // Recessed bronze channel. End-caps and fading separators are drawn once,
-    // behind the cells.
-    const rail = this.add.graphics();
-    rail.fillGradientStyle(0x000000, 0x000000, 0x1a1b1e, 0x1a1b1e, 0.24, 0.24, 0.05, 0.05);
-    rail.fillRect(x, y, railW, h);
-    rail.lineStyle(1, UI_COLORS.bronze, 0.32);
-    rail.lineBetween(x, y + 0.5, x + railW, y + 0.5);
-    rail.lineStyle(1, 0x000000, 0.62);
-    rail.lineBetween(x, y + h - 0.5, x + railW, y + h - 0.5);
-    rail.fillStyle(UI_COLORS.bronze, 1);
-    rail.fillRect(x - 1, y - 1, 3, h + 2);
-    rail.fillRect(x + railW - 2, y - 1, 3, h + 2);
-
-    for (let i = 1; i < STAT_CHIPS.length; i++) {
-      const sx = x + cw * i;
-      rail.fillStyle(UI_COLORS.bronze, 0.1);
-      rail.fillRect(sx, y + 4, 1, 4);
-      rail.fillStyle(UI_COLORS.bronze, 0.36);
-      rail.fillRect(sx, y + 8, 1, h - 16);
-      rail.fillStyle(UI_COLORS.bronze, 0.1);
-      rail.fillRect(sx, y + h - 8, 1, 4);
-
-      const cy = y + h / 2;
-      const stud = [
-        new Phaser.Math.Vector2(sx, cy - 2.5),
-        new Phaser.Math.Vector2(sx + 2.5, cy),
-        new Phaser.Math.Vector2(sx, cy + 2.5),
-        new Phaser.Math.Vector2(sx - 2.5, cy),
-      ];
-      rail.fillStyle(UI_COLORS.bronzeHi, 1);
-      rail.fillPoints(stud, true);
-      rail.lineStyle(1, 0x000000, 0.5);
-      rail.strokePoints(stud, true);
-    }
-    container.add(rail);
-
     STAT_CHIPS.forEach((chip, i) => {
-      const box = this.add.container(x + cw * i + cw / 2, y + h / 2);
+      const box = this.add.container(x + (cw + RAIL_GAP) * i + cw / 2, y + h / 2);
       container.add(box);
       const left = -cw / 2;
       const top = -h / 2;
       const delta = stats[chip.key] - (base[chip.key] ?? 0);
       const guard = guardByStat[chip.key];
       const statColor = Phaser.Display.Color.IntegerToColor(chip.color).rgba;
+      // The label a step lighter than the icon so the thin serif stays bright.
+      const lc = Phaser.Display.Color.Interpolate.ColorWithColor(
+        Phaser.Display.Color.IntegerToColor(chip.color),
+        Phaser.Display.Color.IntegerToColor(0xffffff),
+        100,
+        30
+      );
+      const labelColor = Phaser.Display.Color.RGBToString(Math.round(lc.r), Math.round(lc.g), Math.round(lc.b));
 
-      if (guard) {
-        box.add(this.add.rectangle(left + 1, top + 1, cw - 2, h - 2, UI_COLORS.guard, 0.1).setOrigin(0));
-      }
-      const hover = this.add.rectangle(left + 1, top + 1, cw - 2, h - 2, chip.color, 1).setOrigin(0).setAlpha(0);
+      const tile = this.add.graphics();
+      tile.fillStyle(0x07080b, 0.9);
+      tile.fillRoundedRect(left, top, cw, h, 7);
+      tile.fillStyle(guard ? UI_COLORS.guard : chip.color, guard ? 0.16 : 0.1);
+      tile.fillRoundedRect(left, top, cw, h, 7);
+      tile.lineStyle(1, guard ? UI_COLORS.guard : chip.color, guard ? 0.8 : 0.38);
+      tile.strokeRoundedRect(left + 0.5, top + 0.5, cw - 1, h - 1, 7);
+      box.add(tile);
+      const hover = this.add.graphics().setAlpha(0);
+      hover.fillStyle(chip.color, 0.14);
+      hover.fillRoundedRect(left, top, cw, h, 7);
+      hover.lineStyle(1.5, chip.color, 1);
+      hover.strokeRoundedRect(left + 0.75, top + 0.75, cw - 1.5, h - 1.5, 7);
       box.add(hover);
 
-      // Faceted gem: 6px diamond, dark rim, small light facet.
-      const gx = left + 8;
-      const gemPts = [
-        new Phaser.Math.Vector2(gx, -3.2),
-        new Phaser.Math.Vector2(gx + 3.2, 0),
-        new Phaser.Math.Vector2(gx, 3.2),
-        new Phaser.Math.Vector2(gx - 3.2, 0),
-      ];
-      const gem = this.add.graphics();
-      gem.fillStyle(chip.color, 1);
-      gem.fillPoints(gemPts, true);
-      gem.lineStyle(1, 0x000000, 0.55);
-      gem.strokePoints(gemPts, true);
-      gem.fillStyle(0xffffff, 0.5);
-      gem.fillTriangle(gx - 1.4, -1.4, gx + 0.6, -1.4, gx - 1.4, 0.6);
-      box.add(gem);
+      const iconKey = isStyledStat(chip.key) ? statIconKey(chip.key) : null;
+      const iconSize = 18;
+      let labelX = left + 12;
+      if (iconKey && this.textures.exists(iconKey)) {
+        box.add(this.add.image(left + 11 + iconSize / 2, 0, iconKey).setDisplaySize(iconSize, iconSize));
+        labelX = left + 11 + iconSize + 8;
+      }
 
       const label = this.add
-        .text(left + 17, top + 2, chip.label, {
-          fontFamily: FONT_FAMILY,
-          fontSize: "8px",
-          fontStyle: "600",
-          color: UI_COLORS.muted,
-        })
-        .setLetterSpacing(1.4);
-      box.add(label);
-
-      const full = this.add
-        .text(left + 17, top + 2, STAT_INFO[chip.key].name, {
-          fontFamily: FONT_FAMILY,
-          fontSize: "8px",
-          fontStyle: "600",
-          color: statColor,
+        .text(labelX, 0.5, chip.label, {
+          fontFamily: FONT_DISPLAY,
+          fontSize: "14px",
+          fontStyle: "700",
+          color: labelColor,
         })
         .setLetterSpacing(1.2)
+        .setOrigin(0, 0.5);
+      box.add(label);
+
+      // On hover the short label gives way to the stat's full name.
+      const full = this.add
+        .text(labelX, 0.5, STAT_INFO[chip.key].name, {
+          fontFamily: FONT_FAMILY,
+          fontSize: "11.5px",
+          fontStyle: "700",
+          color: statColor,
+        })
+        .setOrigin(0, 0.5)
         .setAlpha(0);
       box.add(full);
 
       const valueColor = guard ? UI_COLORS.ivory : delta > 0 ? UI_COLORS.up : delta < 0 ? UI_COLORS.down : UI_COLORS.ivory;
-      box.add(
-        this.add.text(left + 17, top + 12, fmt(stats[chip.key]), {
-          fontFamily: FONT_FAMILY,
-          fontSize: "14px",
-          fontStyle: "700",
+      const value = this.add
+        .text(left + cw - 12, 0, fmt(stats[chip.key]), {
+          fontFamily: FONT_NUM,
+          fontSize: "22px",
+          fontStyle: "600",
           color: valueColor,
         })
-      );
+        .setOrigin(1, 0.5);
+      box.add(value);
 
+      // Guard bonus or change since the start, just left of the number.
+      let marker: string | null = null;
+      let markerColor: string = valueColor;
       if (guard) {
-        box.add(
-          this.add
-            .text(left + cw - 6, top + 4, `+${guardAmount(guard)}`, {
-              fontFamily: FONT_FAMILY,
-              fontSize: "8px",
-              fontStyle: "700",
-              color: "#8fd3ff",
-            })
-            .setOrigin(1, 0)
-        );
-        box.add(this.add.rectangle(left + 1, top + h - 1, cw - 2, 1, UI_COLORS.guard, 0.55).setOrigin(0));
+        marker = `+${guardAmount(guard)}`;
+        markerColor = "#8fd3ff";
       } else if (delta !== 0) {
+        marker = `${delta > 0 ? "▲" : "▼"}${fmt(Math.abs(delta))}`;
+      }
+      if (marker) {
         box.add(
           this.add
-            .text(left + cw - 6, top + 4, `${delta > 0 ? "▲" : "▼"}${fmt(Math.abs(delta))}`, {
-              fontFamily: FONT_FAMILY,
-              fontSize: "8px",
+            .text(value.x - value.width - 6, 1, marker, {
+              fontFamily: FONT_NUM,
+              fontSize: "12px",
               fontStyle: "700",
-              color: valueColor,
+              color: markerColor,
             })
-            .setOrigin(1, 0)
+            .setOrigin(1, 0.5)
         );
       }
-
-      // Hover outline stays on the cell edge; no scaling, so text doesn't move.
-      const ring = this.add.graphics().setVisible(false);
-      ring.lineStyle(1, chip.color, 0.9);
-      ring.strokeRect(left + 1, top + 1, cw - 2, h - 2);
-      box.add(ring);
 
       const hit = this.add.zone(left, top, cw, h).setOrigin(0).setInteractive({ useHandCursor: true });
       box.add(hit);
       hit.on("pointerover", () => {
-        hover.setAlpha(guard ? 0.14 : 0.12);
-        label.setAlpha(0);
-        full.setAlpha(1);
-        ring.setVisible(true);
+        hover.setAlpha(1);
+        if (!marker) {
+          label.setAlpha(0);
+          full.setAlpha(1);
+        }
       });
       hit.on("pointerout", () => {
         hover.setAlpha(0);
         label.setAlpha(1);
         full.setAlpha(0);
-        ring.setVisible(false);
       });
       hit.on("pointerdown", () => this.toggleStatInfo(container, box, chip.key, chip.color, cw, h));
     });
@@ -2003,21 +2009,21 @@ export class BattleScene extends Phaser.Scene {
       chips.push({ text: `${describeEffect(effect)} · ${remaining}t`, color: positive ? CHIP_COLOR.up : CHIP_COLOR.down });
     }
 
-    const h = 18;
+    const h = 21;
     let x = STRIP_PAD;
     for (let i = 0; i < chips.length; i++) {
       const chip = chips[i];
       if (!chip) break;
       const text = this.add
-        .text(0, y + h / 2, chip.text, { fontFamily: FONT_FAMILY, fontSize: "10px", fontStyle: "600", color: TEXT.white })
+        .text(0, y + h / 2, chip.text, { fontFamily: FONT_FAMILY, fontSize: "12px", fontStyle: "700", color: TEXT.white })
         .setOrigin(0, 0.5);
-      const w = text.width + 14;
+      const w = text.width + 18;
       const moreW = 34;
       if (x + w > maxX - (i < chips.length - 1 ? moreW : 0)) {
         text.destroy();
         container.add(
           this.add
-            .text(x, y + h / 2, `+${chips.length - i}`, { fontFamily: FONT_FAMILY, fontSize: "11px", color: TEXT.muted })
+            .text(x, y + h / 2, `+${chips.length - i}`, { fontFamily: FONT_NUM, fontSize: "13px", color: UI_COLORS.body })
             .setOrigin(0, 0.5)
         );
         break;
@@ -2025,7 +2031,9 @@ export class BattleScene extends Phaser.Scene {
       const bg = this.add.graphics();
       bg.fillStyle(chip.color, 1);
       bg.fillRoundedRect(x, y, w, h, h / 2);
-      text.setX(x + 7);
+      bg.lineStyle(1, 0xffffff, 0.18);
+      bg.strokeRoundedRect(x + 0.5, y + 0.5, w - 1, h - 1, h / 2);
+      text.setX(x + 9);
       container.add([bg, text]);
       x += w + 6;
     }
@@ -2036,26 +2044,28 @@ export class BattleScene extends Phaser.Scene {
     const ready = canUseUltimate(fighter);
     let barX = x0;
     if (this.textures.exists(ULTIMATE_ICON_KEY)) {
-      container.add(this.add.image(x0 + 7, y, ULTIMATE_ICON_KEY).setDisplaySize(16, 16));
-      barX = x0 + 22;
+      container.add(this.add.image(x0 + 9, y, ULTIMATE_ICON_KEY).setDisplaySize(18, 18));
+      barX = x0 + 26;
     }
     const barW = w - (barX - x0) - 64;
     const g = this.add.graphics();
     g.fillStyle(COLORS.meterTrack, 1);
-    g.fillRoundedRect(barX, y - 5, barW, 10, 5);
+    g.fillRoundedRect(barX, y - 6, barW, 12, 6);
+    g.lineStyle(1, GOLD, 0.22);
+    g.strokeRoundedRect(barX + 0.5, y - 5.5, barW - 1, 11, 5.5);
     const bw = barW * Math.min(1, fighter.ultimateMeter / cost);
     if (bw > 0) {
       g.fillStyle(ready ? COLORS.ultimateHover : COLORS.meterFill, 1);
-      g.fillRoundedRect(barX, y - 5, bw, 10, Math.min(5, bw / 2));
+      g.fillRoundedRect(barX, y - 6, bw, 12, Math.min(6, bw / 2));
     }
     container.add(g);
 
     const label = this.add
-      .text(x0 + w - 8, y, ready ? "READY!" : `${fmt(fighter.ultimateMeter)}/${cost}`, {
-        fontFamily: FONT_FAMILY,
-        fontSize: ready ? "12px" : "11px",
-        fontStyle: "800",
-        color: ready ? "#ffd23f" : TEXT.muted,
+      .text(x0 + w - 4, y, ready ? "READY!" : `${fmt(fighter.ultimateMeter)} / ${cost}`, {
+        fontFamily: FONT_NUM,
+        fontSize: "14px",
+        fontStyle: "700",
+        color: ready ? "#ffd23f" : UI_COLORS.body,
       })
       .setOrigin(1, 0.5);
     container.add(label);
@@ -2099,7 +2109,7 @@ export class BattleScene extends Phaser.Scene {
       bg.fillStyle(ULT_RING_LIVE, this.stagedUltimate ? 0.22 : 0.12);
       bg.fillRoundedRect(0, 0, w, h, BADGE_RADIUS);
     }
-    bg.lineStyle(1, UI_COLORS.bronze, 0.28);
+    bg.lineStyle(1, GOLD, 0.3);
     bg.strokeRoundedRect(0.5, 0.5, w - 1, h - 1, BADGE_RADIUS);
     c.add(bg);
 
@@ -2127,27 +2137,27 @@ export class BattleScene extends Phaser.Scene {
     }
 
     const cx = w / 2;
-    c.add(this.add.circle(cx, 52, 32, COLORS.meterTrack));
-    c.add(this.add.circle(cx, 52, 33, 0x000000, 0).setStrokeStyle(1, UI_COLORS.bronze, 0.5));
+    c.add(this.add.circle(cx, 56, 35, COLORS.meterTrack));
+    c.add(this.add.circle(cx, 56, 36, 0x000000, 0).setStrokeStyle(1.5, GOLD, 0.6));
     const iconKey = classIconKey(player.classDef.id);
     if (this.textures.exists(iconKey)) {
-      c.add(this.add.image(cx, 52, iconKey).setDisplaySize(44, 44));
+      c.add(this.add.image(cx, 56, iconKey).setDisplaySize(50, 50));
     }
     c.add(
       this.add
-        .text(cx, 94, "CLASS", {
-          fontFamily: FONT_FAMILY,
-          fontSize: "8.5px",
-          fontStyle: "600",
-          color: UI_COLORS.faint,
+        .text(cx, 102, "CLASS", {
+          fontFamily: FONT_DISPLAY,
+          fontSize: "10.5px",
+          fontStyle: "700",
+          color: GOLD_CSS,
         })
-        .setLetterSpacing(1.6)
+        .setLetterSpacing(2.4)
         .setOrigin(0.5, 0)
     );
     c.add(
-      this.add.text(cx, 108, this.displayName(player), {
+      this.add.text(cx, 118, this.displayName(player), {
         fontFamily: FONT_DISPLAY,
-        fontSize: "15px",
+        fontSize: "18px",
         fontStyle: "700",
         color: UI_COLORS.ivory,
         align: "center",
@@ -2160,16 +2170,16 @@ export class BattleScene extends Phaser.Scene {
     else if (ready) ult = "ULTIMATE READY";
     else ult = `ULT ${fmt(player.ultimateMeter)}/${cost}`;
     const ultText = this.add.text(0, 0, ult, {
-      fontFamily: FONT_FAMILY,
-      fontSize: "10.5px",
+      fontFamily: FONT_NUM,
+      fontSize: ready ? "12.5px" : "14px",
       fontStyle: "700",
-      color: ready ? "#ffd23f" : UI_COLORS.muted,
+      color: ready ? "#ffd23f" : UI_COLORS.body,
     });
     const ultIcon = this.textures.exists(ULTIMATE_ICON_KEY)
-      ? this.add.image(5, 5, ULTIMATE_ICON_KEY).setDisplaySize(10, 10).setTint(0xd8b95c)
+      ? this.add.image(7, ultText.height / 2, ULTIMATE_ICON_KEY).setDisplaySize(14, 14)
       : null;
-    const iconW = ultIcon ? 14 : 0;
-    const ultGroup = this.add.container(cx - (iconW + ultText.width) / 2, 144);
+    const iconW = ultIcon ? 19 : 0;
+    const ultGroup = this.add.container(cx - (iconW + ultText.width) / 2, 156);
     if (ultIcon) ultGroup.add(ultIcon);
     ultText.setPosition(iconW, 0);
     ultGroup.add(ultText);
@@ -2193,7 +2203,7 @@ export class BattleScene extends Phaser.Scene {
     const bg = this.add.graphics();
     bg.fillGradientStyle(0x1b1c20, 0x1b1c20, 0x0e0f11, 0x0e0f11, 1, 1, 1, 1);
     bg.fillRoundedRect(0, 0, w, h, 8);
-    bg.lineStyle(1, UI_COLORS.bronze, 0.55);
+    bg.lineStyle(1, GOLD, 0.6);
     bg.strokeRoundedRect(0.5, 0.5, w - 1, h - 1, 8);
     bg.lineStyle(1, 0xffffff, 0.045);
     bg.lineBetween(10, 1.5, w - 10, 1.5);
@@ -2205,26 +2215,26 @@ export class BattleScene extends Phaser.Scene {
     this.endTurnHover.setVisible(false);
     bar.add(this.endTurnHover);
 
-    this.endTurnPips = this.add.container(w / 2, 15);
+    this.endTurnPips = this.add.container(w / 2, 13);
     bar.add(this.endTurnPips);
 
     this.endTurnTitle = this.add
-      .text(w / 2, 25, "END TURN", {
+      .text(w / 2, 21, "END TURN", {
         fontFamily: FONT_DISPLAY,
-        fontSize: "12px",
+        fontSize: "16px",
         fontStyle: "700",
         color: UI_COLORS.ivory,
       })
-      .setLetterSpacing(1.4)
+      .setLetterSpacing(2.2)
       .setOrigin(0.5, 0);
     bar.add(this.endTurnTitle);
 
     this.endTurnSub = this.add
       .text(w / 2, 44, "", {
         fontFamily: FONT_FAMILY,
-        fontSize: "9.5px",
-        fontStyle: "500",
-        color: UI_COLORS.muted,
+        fontSize: "12px",
+        fontStyle: "600",
+        color: UI_COLORS.body,
       })
       .setOrigin(0.5, 0);
     bar.add(this.endTurnSub);
@@ -2252,7 +2262,7 @@ export class BattleScene extends Phaser.Scene {
     this.endTurnSub.setText(plays > 0 ? `${left} AP this turn · ${plays} staged` : `${left} AP this turn`);
     this.endTurnPips.removeAll(true);
 
-    const gap = 9;
+    const gap = 12;
     const startX = -((max - 1) * gap) / 2;
     for (let i = 0; i < max; i++) {
       const pip = this.add.graphics({ x: startX + i * gap, y: 0 });
@@ -2261,10 +2271,10 @@ export class BattleScene extends Phaser.Scene {
       pip.fillStyle(lit ? AP_RING_LIVE : AP_RING_SPENT, 1);
       pip.fillPoints(
         [
-          new Phaser.Math.Vector2(0, -3),
-          new Phaser.Math.Vector2(3, 0),
-          new Phaser.Math.Vector2(0, 3),
-          new Phaser.Math.Vector2(-3, 0),
+          new Phaser.Math.Vector2(0, -4),
+          new Phaser.Math.Vector2(4, 0),
+          new Phaser.Math.Vector2(0, 4),
+          new Phaser.Math.Vector2(-4, 0),
         ],
         true
       );
@@ -2308,12 +2318,12 @@ export class BattleScene extends Phaser.Scene {
     const { container: cardContainer, bg } = drawCardFace(this, this.handFace(card), CARD_W, CARD_H);
     cardContainer.setPosition(x, 0);
     if (locked) {
-      cardContainer.setAlpha(0.5);
+      this.dimCard(cardContainer, 0.5);
       bg.disableInteractive();
     } else {
       // Can't be paid for after what's already picked: dimmed, but it can
       // still be opened to read (the preview says why it can't be played).
-      if (unplayableReason(this.battle.player, card, this.staged, this.orders)) cardContainer.setAlpha(0.55);
+      if (unplayableReason(this.battle.player, card, this.staged, this.orders)) this.dimCard(cardContainer, 0.45);
       // Hover expands the card, growing up from its bottom edge.
       bg.on("pointerover", (pointer: Phaser.Input.Pointer) => {
         if (pointer.wasTouch) return;
@@ -2334,6 +2344,15 @@ export class BattleScene extends Phaser.Scene {
       bg.on("pointerdown", () => this.onCardClick(card.id));
     }
     this.handContainer.add(cardContainer);
+  }
+
+  // Darken a hand card with a shade on top rather than container alpha, so
+  // overlapping cards don't show through each other.
+  dimCard(cardContainer: Phaser.GameObjects.Container, amount: number): void {
+    const shade = this.add.graphics();
+    shade.fillStyle(0x07080b, amount);
+    shade.fillRoundedRect(0, 0, CARD_W, CARD_H, 9 * (CARD_W / 143));
+    cardContainer.add(shade);
   }
 
   // The previewed card, full size in the middle of the screen over a dimmed
@@ -2584,9 +2603,9 @@ export class BattleScene extends Phaser.Scene {
             this.add
               .text(cx, cy + 14, "STAGE", {
                 fontFamily: FONT_FAMILY,
-                fontSize: "7.5px",
-                fontStyle: "600",
-                color: UI_COLORS.faint,
+                fontSize: "10px",
+                fontStyle: "700",
+                color: UI_COLORS.muted,
               })
               .setLetterSpacing(1.4)
               .setOrigin(0.5, 0)
@@ -2600,7 +2619,7 @@ export class BattleScene extends Phaser.Scene {
       const x0 = x + (SLOT_W - (w + step * (faces.length - 1))) / 2;
       faces.forEach(({ data, cardId }, i) => {
         const { container, bg } = drawCardFace(this, data, w, h, { scale: STAGE_SCALE });
-        container.setPosition(x0 + i * step, SLOT_Y + (SLOT_H - h) / 2 + 8);
+        container.setPosition(x0 + i * step, SLOT_Y + (SLOT_H - h) / 2);
         if (!pending && this.canAct()) {
           bg.on("pointerdown", () => (cardId === null ? this.onUltimateClick() : this.unstage(cardId)));
         } else {
@@ -2611,9 +2630,9 @@ export class BattleScene extends Phaser.Scene {
         if (target) {
           this.slotsContainer.add(
             this.add
-              .text(x0 + i * step + w / 2, SLOT_Y + (SLOT_H - h) / 2 + 8 + h + 3, `→ ${this.targetName(target)}`, {
+              .text(x0 + i * step + w / 2, SLOT_Y + (SLOT_H - h) / 2 + h + 1, `→ ${this.targetName(target)}`, {
                 fontFamily: FONT_FAMILY,
-                fontSize: "9px",
+                fontSize: "11px",
                 fontStyle: "800",
                 color: "#ffd23f",
                 stroke: "#000000",
@@ -2632,11 +2651,11 @@ export class BattleScene extends Phaser.Scene {
         : "STAGE · CLICK A CARD TO STAGE IT";
     this.slotsContainer.add(
       this.add
-        .text(PLAY_ZONE_CX, SLOT_Y + SLOT_H + 8, caption, {
+        .text(PLAY_ZONE_CX, SLOT_Y + SLOT_H + 6, caption, {
           fontFamily: FONT_FAMILY,
-          fontSize: "8px",
-          fontStyle: "600",
-          color: UI_COLORS.faint,
+          fontSize: "10px",
+          fontStyle: "700",
+          color: UI_COLORS.muted,
         })
         .setLetterSpacing(1.2)
         .setOrigin(0.5, 0)
@@ -2653,7 +2672,7 @@ export class BattleScene extends Phaser.Scene {
     for (const { fighter, x, label } of sides) {
       const field = fighter.field ?? [];
       const backing = this.add.graphics();
-      backing.fillStyle(0x0c0d0e, 0.55);
+      backing.fillStyle(UI_COLORS.panel, 0.86);
       backing.fillRoundedRect(x, FIELD_Y, FIELD_W, FIELD_H, 10);
       backing.lineStyle(1, UI_COLORS.edge, 0.95);
       backing.strokeRoundedRect(x + 0.5, FIELD_Y + 0.5, FIELD_W - 1, FIELD_H - 1, 10);
@@ -2662,9 +2681,9 @@ export class BattleScene extends Phaser.Scene {
         this.add
           .text(x + 10, FIELD_Y + 7, label.toUpperCase(), {
             fontFamily: FONT_FAMILY,
-            fontSize: "8.5px",
-            fontStyle: "600",
-            color: UI_COLORS.faint,
+            fontSize: "10.5px",
+            fontStyle: "700",
+            color: UI_COLORS.muted,
           })
           .setLetterSpacing(1.3)
       );
@@ -2672,9 +2691,9 @@ export class BattleScene extends Phaser.Scene {
         this.add
           .text(x + FIELD_W - 10, FIELD_Y + 7, `${field.length} / ${FIELD_SIZE}`, {
             fontFamily: FONT_FAMILY,
-            fontSize: "8.5px",
-            fontStyle: "600",
-            color: UI_COLORS.faint,
+            fontSize: "10.5px",
+            fontStyle: "700",
+            color: UI_COLORS.muted,
           })
           .setLetterSpacing(1.1)
           .setOrigin(1, 0)
@@ -2721,9 +2740,9 @@ export class BattleScene extends Phaser.Scene {
             this.add
               .text(cx, cy + 16, "EMPTY", {
                 fontFamily: FONT_FAMILY,
-                fontSize: "7.5px",
-                fontStyle: "600",
-                color: UI_COLORS.faint,
+                fontSize: "9.5px",
+                fontStyle: "700",
+                color: UI_COLORS.muted,
               })
               .setLetterSpacing(1.2)
               .setAlpha(0.85)
@@ -2735,11 +2754,11 @@ export class BattleScene extends Phaser.Scene {
       if (field.length === 0) {
         this.fieldContainer.add(
           this.add
-            .text(x + FIELD_W / 2, FIELD_Y + FIELD_H - 18, "No monsters yet", {
+            .text(x + FIELD_W / 2, FIELD_Y + FIELD_H - 20, "No monsters yet", {
               fontFamily: FONT_FAMILY,
-              fontSize: "8px",
+              fontSize: "11px",
               fontStyle: "500",
-              color: UI_COLORS.faint,
+              color: UI_COLORS.muted,
             })
             .setOrigin(0.5)
             .setAlpha(0.8)
