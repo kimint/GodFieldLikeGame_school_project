@@ -87,6 +87,10 @@ function pickCardText(cardName: string, intro: string, extra = ""): (s: Tutorial
 
 const focusHandCard = (cardId: string) => (s: TutorialBattleScene): Rect | null =>
   previewing(s, cardId) ? null : s.handCardRect(cardId);
+const focusApPanel = (): Rect => {
+  const { x, y, w, h } = LAYOUT.apPanel;
+  return { x, y, w, h };
+};
 const focusEndTurn = (): Rect => {
   const { x, y, w, h } = LAYOUT.endTurn;
   return { x, y, w, h };
@@ -159,9 +163,9 @@ const SCRIPT: ScriptedRound[] = [
         title: "AP",
         info: true,
         text: () =>
-          "Cards cost AP. The ring around End turn shows yours: 2 this round, and Ember Dart uses 1.\n\n" +
+          "Cards cost AP. The crystals above End turn show yours: 2 this round, and Ember Dart has reserved 1 (the dashed gold one).\n\n" +
           "Max AP goes up by 1 every round (up to 10). AP you don't spend is lost when the turn ends.",
-        focus: focusEndTurn,
+        focus: focusApPanel,
       },
       endTurnStep("end-1", "Press End turn to lock in your turn. Then watch the replay of both turns."),
     ],
@@ -517,6 +521,12 @@ export class TutorialBattleScene extends BattleScene {
     if (!fighter.field[index]) return null;
     const { x, y } = this.monsterPos(side, index);
     return { x, y, w: LAYOUT.monster.w, h: LAYOUT.monster.h };
+  }
+
+  handCardPlayable(card: Card, locked: boolean): boolean {
+    const allow = this.currentStep()?.allow;
+    if (this.scripted() && !(allow?.kind === "card" && allow.cardId === card.cardId)) return false;
+    return super.handCardPlayable(card, locked);
   }
 
   drawHandCard(card: Card, x: number, locked: boolean): void {

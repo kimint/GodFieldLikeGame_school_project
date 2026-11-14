@@ -12,7 +12,8 @@ import { cardPriority, describeCard, ULTIMATE_PRIORITY, type PlayRecord } from "
 import type { DamageType, Element } from "../model/damageTypes.ts";
 
 export const AP_GEM_COLOR = 0x2f7fd0;
-export const AP_SHORT_COLOR = 0xc0392b; // a cost gem you can't pay right now
+export const AP_SHORT_COLOR = 0x8f2318; // a cost gem you can't pay right now
+export const PLAYABLE_GLOW = 0x5fd4ff; // matches the AP crystals
 
 // card: { cardId, category, name, damageType, description } -- a hand card
 // instance plus its describeCard() text, or one of a fighter's plays. The
@@ -25,6 +26,7 @@ export interface CardFaceData {
   element?: Element | null;
   cost?: number | null; // AP cost, drawn as a gem in the corner
   costShort?: boolean; // not enough AP left for it: the gem turns red
+  playable?: boolean; // can be played right now: a soft cyan glow round the card and its gem
   description?: string | null;
   priority?: number | null; // strike priority, drawn as a badge atop the description
   rarity?: Rarity | null; // rare / legend: a border inside the art window and a gem on the name plate
@@ -128,7 +130,7 @@ export function drawCardFace(
   w: number,
   h: number,
   _opts: { scale?: number } = {}
-): { container: Phaser.GameObjects.Container; bg: Phaser.GameObjects.Graphics } {
+): { container: Phaser.GameObjects.Container; bg: Phaser.GameObjects.Graphics; glow: Phaser.GameObjects.Graphics | null } {
   void _opts; // sizes follow w/h now; kept so callers don't change
   const container = scene.add.container(0, 0);
   const isUltimate = card.category === "ultimate";
@@ -153,6 +155,17 @@ export function drawCardFace(
   const bg = roundedRect(scene, w, h, CARD_INK, radius);
   container.add(bg);
 
+  // Playable now: a soft AP-cyan glow just outside the card (behind it).
+  let glow: Phaser.GameObjects.Graphics | null = null;
+  if (card.playable) {
+    glow = scene.add.graphics();
+    for (let i = 1; i <= 4; i++) {
+      glow.lineStyle(2.5 * u, PLAYABLE_GLOW, 0.34 - i * 0.07);
+      glow.strokeRoundedRect(-i * 1.6 * u, -i * 1.6 * u, w + i * 3.2 * u, h + i * 3.2 * u, radius + i * 1.6 * u);
+    }
+    container.addAt(glow, 0);
+  }
+
   const g = scene.add.graphics();
   // Category wash, strongest at the top.
   g.fillStyle(color, 0.34);
@@ -160,7 +173,7 @@ export function drawCardFace(
   g.fillStyle(CARD_INK, 0.45);
   g.fillRoundedRect(0, h * 0.55, w, h * 0.45, { tl: 0, tr: 0, bl: radius, br: radius });
   // Frame: a gold outer edge and a thin category-coloured inner hairline.
-  g.lineStyle(Math.max(1, 1.6 * u), isUltimate ? 0xffd86b : GOLD, 0.95);
+  g.lineStyle(Math.max(1, 1.6 * u), card.playable ? 0xbff0ff : isUltimate ? 0xffd86b : GOLD, 0.95);
   g.strokeRoundedRect(0.8 * u, 0.8 * u, w - 1.6 * u, h - 1.6 * u, radius);
   const inset = LAYOUT.inset * u;
   g.lineStyle(Math.max(1, 0.9 * u), shade(color, 0.35), 0.55);
@@ -227,6 +240,12 @@ export function drawCardFace(
     const r = LAYOUT.gem.r * u;
     const gemColor = card.costShort ? AP_SHORT_COLOR : AP_GEM_COLOR;
     const gem = scene.add.graphics();
+    if (card.playable) {
+      gem.fillStyle(PLAYABLE_GLOW, 0.22);
+      gem.fillCircle(gx, gy, r + 5 * u);
+      gem.fillStyle(PLAYABLE_GLOW, 0.3);
+      gem.fillCircle(gx, gy, r + 2.6 * u);
+    }
     gem.fillStyle(0x000000, 0.45);
     gem.fillCircle(gx, gy + 1.2 * u, r + 1.5 * u);
     gem.fillStyle(shade(gemColor, -0.35), 1);
@@ -235,7 +254,7 @@ export function drawCardFace(
     gem.fillCircle(gx, gy - 0.8 * u, r * 0.84);
     gem.fillStyle(0xffffff, 0.22);
     gem.fillEllipse(gx, gy - r * 0.42, r * 1.1, r * 0.5);
-    gem.lineStyle(Math.max(1, 1.4 * u), card.costShort ? 0xffb4a8 : 0xbfe0ff, 1);
+    gem.lineStyle(Math.max(1, 1.4 * u), card.costShort ? 0xff8a7a : 0xbfe0ff, 1);
     gem.strokeCircle(gx, gy, r);
     container.add(gem);
     container.add(
@@ -243,8 +262,8 @@ export function drawCardFace(
         fontFamily: CARD_FONT.cost,
         fontSize: px(15.5 * u),
         fontStyle: "700",
-        color: "#ffffff",
-        stroke: "#06121f",
+        color: card.costShort ? "#ffd2cc" : "#ffffff",
+        stroke: card.costShort ? "#3a0904" : "#06121f",
         strokeThickness: Math.max(1, 2 * u),
       }).setOrigin(0.5)
     );
@@ -368,5 +387,5 @@ export function drawCardFace(
     }
   }
 
-  return { container, bg };
+  return { container, bg, glow };
 }

@@ -118,16 +118,18 @@ const FAN_OVERLAP = 8;
 // Your class badge, in the right column between the log and End turn: icon + name,
 // ringed by a yellow gauge for the ultimate meter. Once it's full the badge
 // glows and pulses, and clicking it toggles the ultimate for this turn.
-const CLASS_BADGE = { x: 1008, y: 478, w: 256, h: 156 };
+const CLASS_BADGE = { x: 1008, y: 438, w: 256, h: 94 };
 const BADGE_RADIUS = 14;
 const ULT_RING_W = 5;
 const ULT_RING_LIVE = 0xffd23f;
 
-// The End turn bar sits under the log, in the right column. One pip per AP:
-// lit = AP left, pulsing = about to be spent, dark = spent on this turn.
-const END_TURN = { x: 1008, y: 644, w: 256, h: 66 };
-const AP_RING_LIVE = 0xffd23f;
-const AP_RING_SPENT = 0x3a3220;
+// The AP panel sits under the class badge in the right column: big AP count
+// and one crystal per AP, with the End turn button at its bottom.
+const AP_PANEL = { x: 1008, y: 540, w: 256, h: 170 };
+const AP_CRYSTAL_Y = 74;
+const END_TURN = { x: AP_PANEL.x + 12, y: AP_PANEL.y + 106, w: AP_PANEL.w - 24, h: 54 };
+const AP_LIVE = 0x3cc8f5;
+const AP_RESERVED = 0xf2b544;
 const HOVER_LIFT = 14;
 const HOVER_SCALE = 1.12;
 const PREVIEW_SCALE = 1.3; // 231px card -> 300px
@@ -174,7 +176,7 @@ export interface PendingTurn {
   round: number; // battle.round at commit
 }
 
-const LOG_BOX = { x: 1008, y: 48, w: 256, h: 420 };
+const LOG_BOX = { x: 1008, y: 48, w: 256, h: 382 };
 const LOG_HEAD_H = 38;
 const LOG_FOOT_H = 26;
 const LOG_X = LOG_BOX.x;
@@ -366,6 +368,7 @@ export const LAYOUT = {
   playerSlot: { x: PLAY_ZONE_CX + SLOT_TOTAL_W / 2 - SLOT_W, y: SLOT_Y, w: SLOT_W, h: SLOT_H },
   classBadge: CLASS_BADGE,
   endTurn: { x: END_TURN.x, y: END_TURN.y, w: END_TURN.w, h: END_TURN.h },
+  apPanel: AP_PANEL,
   handY: HAND_Y,
   card: { w: CARD_W, h: CARD_H },
   monster: { w: MONSTER_W, h: MONSTER_H },
@@ -428,6 +431,8 @@ export class BattleScene extends Phaser.Scene {
   endTurnPips!: Phaser.GameObjects.Container;
   endTurnHit!: Phaser.GameObjects.Zone;
   endTurnHover!: Phaser.GameObjects.Graphics;
+  apCount!: Phaser.GameObjects.Text;
+  apMax!: Phaser.GameObjects.Text;
   endTurnEnabled = true;
   slotsContainer!: Phaser.GameObjects.Container;
   fieldContainer!: Phaser.GameObjects.Container;
@@ -1398,20 +1403,24 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0, 0.5);
     container.add(name);
 
-    // AP pill beside the name: left this turn / this turn's max (for you,
-    // after the cards picked so far).
-    const apText = this.add
-      .text(0, 0, `AP ${fmt(fighter === this.battle.player && !this.pendingTurn ? this.plannedAp() : fighter.ap)}/${fighter.maxAp ?? fighter.ap}`, { fontFamily: FONT_NUM, fontSize: "13px", fontStyle: "700", color: TEXT.white })
-      .setOrigin(0, 0.5);
-    const pillX = STRIP_PAD + side.width + name.width + 20;
-    const pillW = apText.width + 18;
-    const pill = this.add.graphics();
-    pill.fillStyle(AP_GEM_COLOR, 1);
-    pill.fillRoundedRect(pillX, 6, pillW, 21, 10.5);
-    pill.lineStyle(1, 0xbfe0ff, 0.7);
-    pill.strokeRoundedRect(pillX + 0.5, 6.5, pillW - 1, 20, 10);
-    apText.setPosition(pillX + 9, 16.5);
-    container.add([pill, apText]);
+    // The opponent's AP as a pill beside the name. Yours has its own panel
+    // with crystals above End turn, by the hand.
+    let headerLeft = STRIP_PAD + side.width + name.width + 20;
+    if (key === "cpu") {
+      const apText = this.add
+        .text(0, 0, `AP ${fmt(fighter.ap)}/${fighter.maxAp ?? fighter.ap}`, { fontFamily: FONT_NUM, fontSize: "13px", fontStyle: "700", color: TEXT.white })
+        .setOrigin(0, 0.5);
+      const pillX = headerLeft;
+      const pillW = apText.width + 18;
+      const pill = this.add.graphics();
+      pill.fillStyle(AP_GEM_COLOR, 1);
+      pill.fillRoundedRect(pillX, 6, pillW, 21, 10.5);
+      pill.lineStyle(1, 0xbfe0ff, 0.7);
+      pill.strokeRoundedRect(pillX + 0.5, 6.5, pillW - 1, 20, 10);
+      apText.setPosition(pillX + 9, 16.5);
+      container.add([pill, apText]);
+      headerLeft = pillX + pillW + 10;
+    }
 
     const handCount = fighter.handCount ?? fighter.hand.length;
     const hand = this.add
@@ -1424,7 +1433,7 @@ export class BattleScene extends Phaser.Scene {
       .setLetterSpacing(1.2)
       .setOrigin(1, 0.5);
     container.add(hand);
-    return { left: pillX + pillW + 10, right: w - STRIP_PAD - hand.width - 12 };
+    return { left: headerLeft, right: w - STRIP_PAD - hand.width - 12 };
   }
 
   // While a defend card is up: a pulsing blue frame around the strip and a
@@ -2127,53 +2136,53 @@ export class BattleScene extends Phaser.Scene {
     }
 
     // Medallion on the left, text on the right (as in the lobby's inspector).
-    const mx = 62;
+    const mx = 50;
     const my = h / 2;
-    c.add(this.add.circle(mx, my, 40, 0x0b0d13));
-    c.add(this.add.circle(mx, my, 40.5, 0x000000, 0).setStrokeStyle(1.5, GOLD, 0.65));
+    c.add(this.add.circle(mx, my, 33, 0x0b0d13));
+    c.add(this.add.circle(mx, my, 33.5, 0x000000, 0).setStrokeStyle(1.5, GOLD, 0.65));
     const iconKey = classIconKey(player.classDef.id);
     if (this.textures.exists(iconKey)) {
-      c.add(this.add.image(mx, my, iconKey).setDisplaySize(56, 56));
+      c.add(this.add.image(mx, my, iconKey).setDisplaySize(46, 46));
     }
-    const tx = 118;
-    const tw = w - tx - 14;
+    const tx = 96;
+    const tw = w - tx - 12;
     c.add(
       this.add
-        .text(tx, 30, "CLASS", {
+        .text(tx, 12, "CLASS", {
           fontFamily: FONT_DISPLAY,
-          fontSize: "11px",
+          fontSize: "10.5px",
           fontStyle: "700",
           color: GOLD_CSS,
         })
         .setLetterSpacing(2.6)
     );
-    const nameText = this.add.text(tx, 48, this.displayName(player), {
+    const nameText = this.add.text(tx, 27, this.displayName(player), {
       fontFamily: FONT_DISPLAY,
-      fontSize: "19px",
+      fontSize: "18px",
       fontStyle: "700",
       color: UI_COLORS.ivory,
-      wordWrap: { width: tw },
     });
+    if (nameText.width > tw) nameText.setScale(tw / nameText.width);
     c.add(nameText);
     let ult: string;
-    if (this.stagedUltimate) ult = "ULTIMATE ✓\nclick to undo";
-    else if (ready && usable) ult = "ULTIMATE READY\nclick to use";
+    if (this.stagedUltimate) ult = "ULTIMATE ✓ · undo";
+    else if (ready && usable) ult = "ULTIMATE · CLICK";
     else if (ready) ult = "ULTIMATE READY";
     else ult = `ULT ${fmt(player.ultimateMeter)} / ${cost}`;
     const ultText = this.add.text(0, 0, ult, {
       fontFamily: FONT_NUM,
-      fontSize: ready ? "13px" : "15px",
+      fontSize: "14px",
       fontStyle: "700",
       color: ready ? "#ffd23f" : UI_COLORS.body,
-      lineSpacing: 2,
     });
     const ultIcon = this.textures.exists(ULTIMATE_ICON_KEY)
-      ? this.add.image(8, 9, ULTIMATE_ICON_KEY).setDisplaySize(16, 16)
+      ? this.add.image(8, ultText.height / 2, ULTIMATE_ICON_KEY).setDisplaySize(16, 16)
       : null;
     const iconW = ultIcon ? 22 : 0;
-    const ultGroup = this.add.container(tx, Math.max(nameText.y + nameText.height + 12, h - 30 - ultText.height / 2));
+    const ultGroup = this.add.container(tx, 58);
     if (ultIcon) ultGroup.add(ultIcon);
     ultText.setPosition(iconW, 0);
+    if (ultText.width > tw - iconW) ultText.setScale((tw - iconW) / ultText.width);
     ultGroup.add(ultText);
     c.add(ultGroup);
 
@@ -2184,39 +2193,70 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // The preview's wide End turn bar: title, AP line, and one pip per AP.
-  // Pips keep the ring's meaning -- lit = left, dark = spent, pulsing = the
-  // cost of whatever the player is looking at.
+  // The AP panel above End turn, in the right column: "ACTION POINTS", the
+  // big "left / max" count and one crystal per AP of this round --
+  //   available: a lit cyan crystal,
+  //   reserved:  AP the staged cards will spend (dashed gold, pulsing),
+  //   preview:   AP the card you're looking at would spend (gold, blinking),
+  //   spent:     an empty socket.
+  // End turn is the button at the bottom of the same panel.
   createEndTurnBar(): void {
-    const { x, y, w, h } = END_TURN;
+    const { x, y, w, h } = AP_PANEL;
     const bar = this.add.container(x, y);
     this.endTurnBar = bar;
+    bar.add(drawGlass(this.add.graphics(), 0, 0, w, h, 14, { glow: true, edge: 0.45 }));
 
-    const bg = drawGlass(this.add.graphics(), 0, 0, w, h, 14, { glow: true, edge: 0.6 });
-    bar.add(bg);
+    bar.add(
+      this.add
+        .text(14, 14, "ACTION POINTS", {
+          fontFamily: FONT_DISPLAY,
+          fontSize: "11px",
+          fontStyle: "700",
+          color: GOLD_CSS,
+        })
+        .setLetterSpacing(1.8)
+    );
+    this.apMax = this.add
+      .text(w - 14, 33, "", { fontFamily: FONT_NUM, fontSize: "17px", fontStyle: "600", color: UI_COLORS.body })
+      .setOrigin(1, 0.5);
+    this.apCount = this.add
+      .text(0, 28, "", { fontFamily: FONT_NUM, fontSize: "38px", fontStyle: "700", color: "#bff0ff" })
+      .setOrigin(1, 0.5);
+    this.apCount.setShadow(0, 0, "rgba(95, 212, 255, 0.6)", 12, false, true);
+    bar.add([this.apCount, this.apMax]);
+    this.endTurnPips = this.add.container(w / 2, AP_CRYSTAL_Y);
+    bar.add(this.endTurnPips);
+
+    // The End turn button.
+    const b = { x: END_TURN.x - x, y: END_TURN.y - y, w: END_TURN.w, h: END_TURN.h };
+    const button = this.add.graphics();
+    button.fillStyle(0x161a26, 1);
+    button.fillRoundedRect(b.x, b.y, b.w, b.h, 10);
+    button.fillStyle(GOLD, 0.06);
+    button.fillRoundedRect(b.x, b.y, b.w, b.h / 2, { tl: 10, tr: 10, bl: 0, br: 0 });
+    button.lineStyle(1.5, GOLD, 0.7);
+    button.strokeRoundedRect(b.x + 0.75, b.y + 0.75, b.w - 1.5, b.h - 1.5, 10);
+    bar.add(button);
 
     this.endTurnHover = this.add.graphics();
-    this.endTurnHover.fillStyle(UI_COLORS.bronzeHi, 0.07);
-    this.endTurnHover.fillRoundedRect(0, 0, w, h, 14);
+    this.endTurnHover.fillStyle(UI_COLORS.bronzeHi, 0.12);
+    this.endTurnHover.fillRoundedRect(b.x, b.y, b.w, b.h, 10);
     this.endTurnHover.setVisible(false);
     bar.add(this.endTurnHover);
 
-    this.endTurnPips = this.add.container(w / 2, 13);
-    bar.add(this.endTurnPips);
-
     this.endTurnTitle = this.add
-      .text(w / 2, 21, "END TURN", {
+      .text(b.x + b.w / 2, b.y + 9, "END TURN", {
         fontFamily: FONT_DISPLAY,
-        fontSize: "16px",
+        fontSize: "17px",
         fontStyle: "700",
         color: UI_COLORS.ivory,
       })
-      .setLetterSpacing(2.2)
+      .setLetterSpacing(2.4)
       .setOrigin(0.5, 0);
     bar.add(this.endTurnTitle);
 
     this.endTurnSub = this.add
-      .text(w / 2, 44, "", {
+      .text(b.x + b.w / 2, b.y + 33, "", {
         fontFamily: FONT_FAMILY,
         fontSize: "12px",
         fontStyle: "600",
@@ -2225,7 +2265,7 @@ export class BattleScene extends Phaser.Scene {
       .setOrigin(0.5, 0);
     bar.add(this.endTurnSub);
 
-    const hit = this.add.zone(0, 0, w, h).setOrigin(0).setInteractive({ useHandCursor: true });
+    const hit = this.add.zone(b.x, b.y, b.w, b.h).setOrigin(0).setInteractive({ useHandCursor: true });
     this.endTurnHit = hit;
     bar.add(hit);
     hit.on("pointerover", () => this.endTurnEnabled && this.endTurnHover.setVisible(true));
@@ -2244,35 +2284,95 @@ export class BattleScene extends Phaser.Scene {
     const plays = this.staged.length + (this.stagedUltimate ? 1 : 0) + this.orders.length;
 
     this.endTurnEnabled = !locked;
-    this.endTurnBar.setAlpha(locked ? 0.5 : 1);
-    this.endTurnSub.setText(plays > 0 ? `${left} AP this turn · ${plays} staged` : `${left} AP this turn`);
+    this.endTurnBar.setAlpha(locked ? 0.6 : 1);
+    this.endTurnSub.setText(plays > 0 ? `${plays} staged · ${player.ap - left} AP reserved` : "Lock in this turn");
+    this.apMax.setText(`/ ${max} AP`);
+    this.apCount.setText(fmt(left)).setX(this.apMax.x - this.apMax.width - 6);
+    this.apCount.setColor(left > 0 ? "#bff0ff" : UI_COLORS.muted);
     this.endTurnPips.removeAll(true);
 
-    const gap = 12;
+    // Crystal size fits the row: big for a 2-3 AP round, smaller at 10.
+    const rowW = AP_PANEL.w - 28;
+    const cw = Phaser.Math.Clamp(rowW / Math.max(1, max) - 7, 14, 32);
+    const ch = cw * 1.38;
+    const gap = cw + 7;
     const startX = -((max - 1) * gap) / 2;
     for (let i = 0; i < max; i++) {
-      const pip = this.add.graphics({ x: startX + i * gap, y: 0 });
-      const lit = i < left;
-      const spending = lit && i >= left - preview;
-      pip.fillStyle(lit ? AP_RING_LIVE : AP_RING_SPENT, 1);
-      pip.fillPoints(
-        [
-          new Phaser.Math.Vector2(0, -4),
-          new Phaser.Math.Vector2(4, 0),
-          new Phaser.Math.Vector2(0, 4),
-          new Phaser.Math.Vector2(-4, 0),
-        ],
-        true
-      );
-      if (spending) {
-        this.tweens.add({ targets: pip, alpha: 0.35, duration: 380, yoyo: true, repeat: -1 });
-        pip.once("destroy", () => this.tweens.killTweensOf(pip));
+      let state: "available" | "preview" | "reserved" | "spent";
+      if (i < left - preview) state = "available";
+      else if (i < left) state = "preview";
+      else if (i < player.ap) state = "reserved";
+      else state = "spent";
+      const crystal = this.drawApCrystal(state, cw / 2, ch / 2);
+      crystal.setPosition(startX + i * gap, 0);
+      if (state === "preview" || state === "reserved") {
+        this.tweens.add({
+          targets: crystal,
+          alpha: state === "preview" ? 0.35 : 0.6,
+          duration: state === "preview" ? 380 : 900,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut",
+        });
+        crystal.once("destroy", () => this.tweens.killTweensOf(crystal));
       }
-      this.endTurnPips.add(pip);
+      this.endTurnPips.add(crystal);
     }
 
     if (locked) this.endTurnHit.disableInteractive();
     else this.endTurnHit.setInteractive({ useHandCursor: true });
+  }
+
+  // One AP crystal: a faceted diamond, a (half width), b (half height).
+  drawApCrystal(state: "available" | "preview" | "reserved" | "spent", a: number, b: number): Phaser.GameObjects.Graphics {
+    const g = this.add.graphics();
+    const V = (x: number, y: number): Phaser.Math.Vector2 => new Phaser.Math.Vector2(x, y);
+    const diamond = (k: number): Phaser.Math.Vector2[] => [V(0, -b * k), V(a * k, 0), V(0, b * k), V(-a * k, 0)];
+    if (state === "spent") {
+      g.fillStyle(0x05060a, 0.85);
+      g.fillPoints(diamond(1), true);
+      g.lineStyle(1.5, 0x5a5f6c, 0.9);
+      g.strokePoints(diamond(1), true);
+      return g;
+    }
+    if (state === "reserved") {
+      g.fillStyle(AP_RESERVED, 0.22);
+      g.fillPoints(diamond(1), true);
+      // Dashed gold outline.
+      const pts = diamond(1);
+      g.lineStyle(1.6, AP_RESERVED, 1);
+      for (let e = 0; e < 4; e++) {
+        const p = pts[e] as Phaser.Math.Vector2;
+        const q = pts[(e + 1) % 4] as Phaser.Math.Vector2;
+        const len = Phaser.Math.Distance.BetweenPoints(p, q);
+        const dash = Math.max(3, b * 0.28);
+        for (let t = 0; t < len; t += dash * 1.8) {
+          const t2 = Math.min(len, t + dash);
+          g.lineBetween(p.x + ((q.x - p.x) * t) / len, p.y + ((q.y - p.y) * t) / len, p.x + ((q.x - p.x) * t2) / len, p.y + ((q.y - p.y) * t2) / len);
+        }
+      }
+      return g;
+    }
+    const lit = state === "preview" ? AP_RESERVED : AP_LIVE;
+    const light = state === "preview" ? 0xffe7a8 : 0xb8f1ff;
+    const dark = state === "preview" ? 0x9a6a14 : 0x0f6d9c;
+    // Glow, body, a light facet on the upper left, a dark one lower right,
+    // a highlight and a bright rim.
+    g.fillStyle(lit, 0.16);
+    g.fillPoints(diamond(1.45), true);
+    g.fillStyle(lit, 0.22);
+    g.fillPoints(diamond(1.2), true);
+    g.fillStyle(lit, 1);
+    g.fillPoints(diamond(1), true);
+    g.fillStyle(light, 0.75);
+    g.fillTriangle(0, -b, -a, 0, 0, 0);
+    g.fillStyle(dark, 0.7);
+    g.fillTriangle(0, b, a, 0, 0, 0);
+    g.fillStyle(0xffffff, 0.8);
+    g.fillTriangle(-a * 0.15, -b * 0.7, -a * 0.55, -b * 0.15, -a * 0.2, -b * 0.2);
+    g.lineStyle(1.4, light, 1);
+    g.strokePoints(diamond(1), true);
+    return g;
   }
 
   renderHand(locked: boolean): void {
@@ -2300,8 +2400,19 @@ export class BattleScene extends Phaser.Scene {
     return { ...cardFaceData(card), costShort: !this.pendingTurn && cardCost(card) > this.plannedAp() };
   }
 
+  // Whether a hand card can be played right now (it glows). The tutorial
+  // also requires it to be the card the current step is about.
+  handCardPlayable(card: Card, locked: boolean): boolean {
+    return !locked && !this.pendingTurn && !unplayableReason(this.battle.player, card, this.staged, this.orders);
+  }
+
   drawHandCard(card: Card, x: number, locked: boolean): void {
-    const { container: cardContainer, bg } = drawCardFace(this, this.handFace(card), CARD_W, CARD_H);
+    const face = { ...this.handFace(card), playable: this.handCardPlayable(card, locked) };
+    const { container: cardContainer, bg, glow } = drawCardFace(this, face, CARD_W, CARD_H);
+    if (glow) {
+      this.tweens.add({ targets: glow, alpha: 0.45, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      glow.once("destroy", () => this.tweens.killTweensOf(glow));
+    }
     cardContainer.setPosition(x, 0);
     if (locked) {
       this.dimCard(cardContainer, 0.5);
