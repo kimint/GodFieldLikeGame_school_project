@@ -6,7 +6,7 @@
 import Phaser from "phaser";
 import { COLORS, FONT_FAMILY, RENDER_SCALE, roundedRect } from "./theme.ts";
 import { CARD_ICON_KEY, ULTIMATE_ICON_KEY, damageAccentColor, elementAccentColor } from "../phaserIcons.ts";
-import { loadedArtKey } from "../cardArt.ts";
+import { loadedArtKey, sizedArtKey } from "../cardArt.ts";
 import { cardCost, cardRarity, RARITY, type Card, type Rarity } from "../model/cardTypes.ts";
 import { cardPriority, describeCard, ULTIMATE_PRIORITY, type PlayRecord } from "../model/engine.ts";
 import type { DamageType, Element } from "../model/damageTypes.ts";
@@ -184,16 +184,11 @@ export function drawCardFace(
   artBg.fillRoundedRect(art.x, art.y, art.w, art.h * 0.7, { tl: 4 * u, tr: 4 * u, bl: 0, br: 0 });
   container.add(artBg);
   if (artKey) {
-    const img = scene.add.image(art.x + art.w / 2, art.y + art.h / 2, artKey);
-    const ratio = art.w / art.h;
-    if (img.width / img.height > ratio) {
-      const cropW = img.height * ratio;
-      img.setCrop((img.width - cropW) / 2, 0, cropW, img.height).setScale(art.w / cropW, art.h / img.height);
-    } else {
-      const cropH = img.width / ratio;
-      img.setCrop(0, (img.height - cropH) / 2, img.width, cropH).setScale(art.w / img.width, art.h / cropH);
-    }
-    container.add(img);
+    // Pre-resampled to the window's device pixels (cardArt.sizedArtKey), a
+    // touch over so the hover zoom stays sharp: no GPU minification shimmer.
+    const density = RENDER_SCALE * 1.15;
+    const sized = sizedArtKey(scene, artKey, art.w * density, art.h * density);
+    container.add(scene.add.image(art.x, art.y, sized).setOrigin(0).setDisplaySize(art.w, art.h));
   } else if (iconKey && scene.textures.exists(iconKey)) {
     const size = Math.min(art.w, art.h) * 0.58;
     container.add(scene.add.image(art.x + art.w / 2, art.y + art.h / 2, iconKey).setDisplaySize(size, size));

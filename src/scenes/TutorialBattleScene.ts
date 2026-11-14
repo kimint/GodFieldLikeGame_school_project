@@ -134,7 +134,7 @@ const SCRIPT: ScriptedRound[] = [
         info: true,
         text: (s) =>
           `You're playing ${s.playerClassName}. Your strip shows your HP, AP and stats (click a stat to read about it).\n\n` +
-          "Your class badge at the bottom left fills up with your ultimate meter.",
+          "Your class badge at the bottom right, above End turn, fills up with your ultimate meter.",
         focus: () => LAYOUT.playerStrip,
       },
       {
