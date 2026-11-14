@@ -115,7 +115,12 @@ From the team's "Card Design" doc; see `src/model/engine.ts` for the exact rules
   HP × 0.5 + ATK × 1.5 (+2 guard, +1 ability). The card costs AP × 3 + HP + meter × 0.6,
   plus 1.5 for the card itself. Efficiency = points ÷ cost, relative to a plain 1-AP,
   3-damage attack (1.0): below 1.4 normal, 1.4–2.0 rare, 2.0 and up legend. The weights are
-  first-pass guesses to tune with play.
+  first-pass guesses to tune with play. A deck (starter decks included) holds at most 3
+  copies of a normal card, 2 of a rare and 1 of a legend (`DECK_RULES.maxCopies`), and its
+  rare and legend cards share a budget of 12 points: 1 per rare copy, 2 per legend copy
+  (`DECK_RULES.maxRarityPoints`). To fit it, the Black Mage starter deck leaves out Mana Tap
+  and the Master Craftsman one Tinker and Masterwork Blade; they stay in those classes' pools
+  (0 copies in `class_deck_cards`).
 - **General cards** in every deck; **classes**: Guardian, Pyromancer, Black Mage, Master
   Craftsman, Necromancer.
 - **ATK stat**: flat bonus to attack cards (weapons, Craftsman's ultimate).

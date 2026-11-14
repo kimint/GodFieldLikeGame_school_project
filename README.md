@@ -150,8 +150,10 @@ one machine can log in to two different accounts and play each other for testing
 - **Decks**: every class has its **starter deck** (`class_deck_cards`), which every player has
   and can't edit. Each player can also build **up to 3 custom decks per class** in the deck
   builder (**Edit decks** on the class-select screen). A custom deck uses the class's own cards
-  (the ones in its starter deck), 12–24 cards, at most 4 copies of each — see `DECK_RULES` in
-  `src/model/decks.ts`.
+  (the ones in its starter deck), 12–24 cards, with at most 3 copies of a normal card, 2 of a
+  rare and 1 of a legend, and a **rarity budget** of 12 points (each rare copy costs 1, each
+  legend 2) — see `DECK_RULES` in `src/model/decks.ts`. A card at 0 copies in
+  `class_deck_cards` is in the class's pool but not its starter deck.
 - Custom decks live in the `decks` table (`supabase/migrations/*_player_decks.sql`): each player
   can read/write only their own rows, and a trigger rejects a 4th deck for the same class. The
   deck you pick on the class-select screen is used for vs-CPU and online matches; for online

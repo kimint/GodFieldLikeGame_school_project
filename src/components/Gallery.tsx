@@ -101,7 +101,7 @@ function GalleryCard({ card }: { card: CatalogCardEntry }): ReactElement {
       {orders ? <div className="gallery-desc">{orders}</div> : null}
       <div className="gallery-decks">
         {entries.length > 0
-          ? entries.map((e) => `${e.classDef.name} ×${e.copies}`).join(" · ")
+          ? entries.map((e) => (e.copies > 0 ? `${e.classDef.name} ×${e.copies}` : `${e.classDef.name} (custom decks)`)).join(" · ")
           : "Not in any deck"}
       </div>
     </div>

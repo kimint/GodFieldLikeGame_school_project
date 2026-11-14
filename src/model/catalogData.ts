@@ -462,10 +462,13 @@ const cards: CatalogRows["cards"] = cardRows.map((row) => ({
 // also what puts them in every class's custom-deck card pool (decks.ts).
 const GENERAL_DECK = ["quick_jab", "splash", "spark", "healing_potion", "meditate", "smoke_bomb"];
 
+// Each class's starter deck, which is also its custom-deck card pool. A card at
+// 0 copies is in the pool but not the starter deck. Starter decks follow the
+// same rules as custom decks (copies by rarity, rarity budget; see decks.ts).
 const CLASS_DECKS: Record<string, Record<string, number>> = {
   guardian: {
-    shield_bash: 3,
-    heavy_slam: 2,
+    shield_bash: 2,
+    heavy_slam: 3,
     shield_rush: 2,
     iron_wall: 2,
     brace: 2,
@@ -477,8 +480,8 @@ const CLASS_DECKS: Record<string, Record<string, number>> = {
     stone_sentinel: 2,
   },
   pyromancer: {
-    ember_dart: 3,
-    fire_lance: 2,
+    ember_dart: 2,
+    fire_lance: 3,
     fireball: 2,
     flare: 1,
     inferno: 1,
@@ -490,26 +493,26 @@ const CLASS_DECKS: Record<string, Record<string, number>> = {
   },
   black_mage: {
     shadow_bolt: 3,
-    vampiric_touch: 2,
-    eldritch_blast: 1,
+    vampiric_touch: 1,
+    eldritch_blast: 3,
     hex_ward: 2,
-    dark_pact: 2,
-    mana_tap: 1,
-    curse_of_weakness: 2,
-    acid_rain: 2,
-    soul_siphon: 2,
-    nightmare: 1,
+    dark_pact: 1,
+    mana_tap: 0, // in the pool, not the starter deck (rarity budget)
+    curse_of_weakness: 1,
+    acid_rain: 3,
+    soul_siphon: 1,
+    nightmare: 2,
   },
   craftsman: {
-    forge_hammer: 3,
-    rivet_gun: 2,
-    riveted_plate: 2,
+    forge_hammer: 2,
+    rivet_gun: 1,
+    riveted_plate: 1,
     spring_trap: 2,
-    whetstone: 2,
-    masterwork_blade: 1,
-    tinker: 2,
-    caltrops: 2,
-    clockwork_golem: 2,
+    whetstone: 1,
+    masterwork_blade: 0, // in the pool, not the starter deck (rarity budget)
+    tinker: 0, // in the pool, not the starter deck (rarity budget)
+    caltrops: 3,
+    clockwork_golem: 3,
   },
   necromancer: {
     bone_spear: 2,

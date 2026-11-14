@@ -6,6 +6,9 @@ import { describeCard, describeMonsterOrders } from "../model/engine.ts";
 import {
   DECK_RULES,
   classCardPool,
+  deckRarityPoints,
+  maxCopiesOf,
+  rarityPointsOf,
   deckSize,
   starterDeckList,
   validateDeckList,
@@ -169,13 +172,23 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
     setDirty(true);
   };
 
+  const limitOf = (cardId: string): number => maxCopiesOf(pool.find((c) => c.id === cardId));
+  const overLimit = pool.some((c) => (counts[c.id] ?? 0) > maxCopiesOf(c));
+  const points = deckRarityPoints(list);
+  const overBudget = points > DECK_RULES.maxRarityPoints;
+  // Room for one more copy: under its copy limit, and its rarity points fit.
+  const canAdd = (card: CatalogCardEntry | null | undefined): boolean =>
+    Boolean(card) &&
+    (counts[card!.id] ?? 0) < maxCopiesOf(card) &&
+    points + rarityPointsOf(card) <= DECK_RULES.maxRarityPoints;
+
   const setCopies = (cardId: string, copies: number): void => {
-    setCounts((c) => ({ ...c, [cardId]: Math.max(0, Math.min(DECK_RULES.maxCopies, copies)) }));
+    setCounts((c) => ({ ...c, [cardId]: Math.max(0, Math.min(limitOf(cardId), copies)) }));
     setDirty(true);
   };
 
   const addOne = (cardId: string): void => {
-    if (readOnly || (counts[cardId] ?? 0) >= DECK_RULES.maxCopies) return;
+    if (readOnly || !canAdd(pool.find((c) => c.id === cardId))) return;
     setCopies(cardId, (counts[cardId] ?? 0) + 1);
   };
 
@@ -256,10 +269,21 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
           </span>
           <span className="deck-rule-now">now {total}</span>
         </li>
-        <li className="deck-rule ok">
+        <li className={`deck-rule${overLimit ? " bad" : " ok"}`}>
           <span className="deck-rule-label">Copies</span>
-          <span className="deck-rule-value">max {DECK_RULES.maxCopies} of each card</span>
+          <span className="deck-rule-value">
+            Normal {DECK_RULES.maxCopies.normal} · Rare {DECK_RULES.maxCopies.rare} · Legend {DECK_RULES.maxCopies.legend}
+          </span>
           <span className="deck-rule-now">{classDef.name} cards only</span>
+        </li>
+        <li className={`deck-rule${overBudget ? " bad" : points === DECK_RULES.maxRarityPoints ? " full" : " ok"}`}>
+          <span className="deck-rule-label">Rarity budget</span>
+          <span className="deck-rule-value">
+            max {DECK_RULES.maxRarityPoints} pts · Rare {DECK_RULES.rarityPoints.rare} · Legend {DECK_RULES.rarityPoints.legend}
+          </span>
+          <span className="deck-rule-now">
+            {points}/{DECK_RULES.maxRarityPoints} used
+          </span>
         </li>
         <li className={`deck-rule${atLimit ? " full" : " ok"}`}>
           <span className="deck-rule-label">Custom decks</span>
@@ -319,12 +343,12 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
                   −
                 </button>
                 <span>
-                  {selectedCopies}/{DECK_RULES.maxCopies}
+                  {selectedCopies}/{maxCopiesOf(selected)}
                 </span>
                 <button
                   type="button"
                   aria-label={`Add a ${selected.name}`}
-                  disabled={readOnly || selectedCopies >= DECK_RULES.maxCopies}
+                  disabled={readOnly || !canAdd(selected)}
                   onClick={() => addOne(selected.id)}
                 >
                   +
@@ -437,10 +461,10 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
                 <CardTile
                   key={card.id}
                   card={card}
-                  badge={`${copies}/${DECK_RULES.maxCopies}`}
-                  dim={copies >= DECK_RULES.maxCopies}
+                  badge={`${copies}/${maxCopiesOf(card)}`}
+                  dim={!canAdd(card)}
                   selected={card.id === selectedId}
-                  draggable={!readOnly && copies < DECK_RULES.maxCopies}
+                  draggable={!readOnly && canAdd(card)}
                   onDragStart={dragFrom("pool", card.id)}
                   onSelect={() => setSelectedId(card.id)}
                   onPrimary={() => addOne(card.id)}
