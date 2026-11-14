@@ -1,6 +1,6 @@
 import { useMemo, useState, type DragEvent, type ReactElement } from "react";
 import type { ClassDef } from "../model/classes.ts";
-import { CARD_CATEGORY, cardCost, type Card, type CardCategory } from "../model/cardTypes.ts";
+import { CARD_CATEGORY, cardCost, cardRarity, RARITY, RARITY_LABEL, type Card, type CardCategory } from "../model/cardTypes.ts";
 import type { CatalogCardEntry } from "../model/catalog.ts";
 import { describeCard, describeMonsterOrders } from "../model/engine.ts";
 import {
@@ -77,11 +77,15 @@ interface CardTileProps {
 
 /** One card as a small portrait tile: art, AP cost, name. */
 function CardTile({ card, badge, dim, selected, draggable, onSelect, onPrimary, onSecondary, onDragStart }: CardTileProps): ReactElement {
+  // Rare and legend tiles: a border just inside the tile and a gem before
+  // the name, like the full card faces (FramedCard, cardFace.ts).
+  const rarity = cardRarity(card.props);
+  const marked = rarity !== RARITY.NORMAL;
   return (
     <button
       type="button"
-      className={`card-tile ${card.category}${dim ? " dim" : ""}${selected ? " selected" : ""}`}
-      title={card.name}
+      className={`card-tile ${card.category} rarity-${rarity}${dim ? " dim" : ""}${selected ? " selected" : ""}`}
+      title={marked ? `${card.name} (${RARITY_LABEL[rarity]})` : card.name}
       draggable={draggable}
       onDragStart={onDragStart}
       onClick={onSelect}
@@ -97,9 +101,13 @@ function CardTile({ card, badge, dim, selected, draggable, onSelect, onPrimary, 
       ) : (
         <span className={`card-tile-art gallery-art fallback ${card.category}`}>{card.category}</span>
       )}
+      {marked ? <span className="card-tile-rarity" aria-hidden="true" /> : null}
       <span className="card-tile-cost">{cardCost(card.props)}</span>
       {badge ? <span className="card-tile-badge">{badge}</span> : null}
-      <span className="card-tile-name">{card.name}</span>
+      <span className="card-tile-name">
+        {marked ? <span className="card-tile-gem" aria-label={RARITY_LABEL[rarity]} /> : null}
+        {card.name}
+      </span>
     </button>
   );
 }
