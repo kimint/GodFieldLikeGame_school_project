@@ -1584,10 +1584,14 @@ body {
   --lb-text: #f4f1ea;
   --lb-soft: #d9dbe2;
   --lb-muted: #c0c3cc;
-  --lb-font: "Jost", "Inter", "Helvetica Neue", Arial, sans-serif;
+  /* Display serif for titles/names/labels, a geometric sans for numbers and
+     buttons, a plain sans for body copy. */
+  --lb-display: "Cinzel", "Cormorant Garamond", Georgia, serif;
+  --lb-num: "Outfit", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --lb-body: "Inter", "Helvetica Neue", Arial, sans-serif;
   width: min(1240px, 100%);
   margin: 0 auto;
-  font-family: var(--lb-font);
+  font-family: var(--lb-body);
   color: var(--lb-text);
 }
 
@@ -2297,3 +2301,45 @@ body {
     width: 100%;
   }
 }
+
+/* Lobby typography: which family each element uses. */
+.lobby-heading h1,
+.lobby-class-name,
+.lobby-class-title,
+.lobby-eyebrow,
+.lobby-strengths-label,
+.lobby-stat-label,
+.lobby-slot-title {
+  font-family: var(--lb-display);
+  font-style: normal;
+}
+
+.lobby-stat-value,
+.lobby-grade,
+.lobby-btn,
+.lobby-nav-btn,
+.lobby-deck,
+.lobby-deck-count,
+.lobby-tags span,
+.lobby-strength,
+.lobby-account-name,
+.lobby-logout {
+  font-family: var(--lb-num);
+  font-style: normal;
+}
+
+.lobby-heading h1 { font-weight: 600; font-size: 21px; letter-spacing: 0.3em; }
+.lobby-class-name { font-weight: 600; font-size: 17px; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lobby-class-sub { font-family: var(--lb-body); font-size: 13px; font-weight: 600; letter-spacing: 0.12em; }
+.lobby-class-title { font-weight: 600; font-size: 40px; letter-spacing: 0.06em; }
+.lobby-eyebrow { font-weight: 700; font-size: 14px; letter-spacing: 0.26em; }
+.lobby-strengths-label { font-weight: 600; font-size: 14px; letter-spacing: 0.16em; }
+.lobby-stat-label { font-weight: 700; font-size: 16px; letter-spacing: 0.12em; }
+.lobby-stat-value { font-weight: 700; font-size: 42px; letter-spacing: -0.01em; }
+.lobby-grade { font-weight: 700; }
+.lobby-stat-name { font-size: 14px; font-weight: 500; }
+.lobby-slot-title { font-weight: 600; font-size: 22px; letter-spacing: 0.04em; }
+.lobby-slot p { font-size: 16px; line-height: 1.6; }
+.lobby-btn { font-weight: 600; letter-spacing: 0.02em; }
+.lobby-btn.primary { font-family: var(--lb-display); font-weight: 700; font-size: 21px; letter-spacing: 0.16em; }
+.lobby-nav-btn, .lobby-deck { font-weight: 500; }
