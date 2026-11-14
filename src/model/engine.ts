@@ -55,6 +55,7 @@ import { computeEffectiveStats, type ClassDef } from "./classes.ts";
 import {
   applyDefend,
   cardCost,
+  cardRarity,
   CARD_CATEGORY,
   STACKING,
   type AttackCard,
@@ -62,6 +63,7 @@ import {
   type DefendCard,
   type MonsterAbility,
   type MonsterCard,
+  type Rarity,
 } from "./cardTypes.ts";
 import { ELEMENT, RESIST_STAT, type DamageType, type Element } from "./damageTypes.ts";
 import { buildDeckForClass, findCardById } from "./catalog.ts";
@@ -197,6 +199,7 @@ export interface PlayRecord {
   cost: number | null;
   description: string | null; // describeCard text, without the priority (see `priority`)
   priority: number | null; // strike priority shown as a badge (attack cards above 0, and the ultimate)
+  rarity: Rarity | null; // the card's tier, null for the ultimate
   target: string | null; // who an attack card was aimed at (a monster's name, or "fighter")
   damage: number | null;
   guarded: number; // absorbed by the target's defend card
@@ -665,6 +668,7 @@ function newPlay(card: Card | null): PlayRecord {
     cost: card ? cardCost(card) : null,
     description: card ? describeCard(card, { priority: false }) : null,
     priority: card ? cardPriority(card) : ULTIMATE_PRIORITY,
+    rarity: card ? cardRarity(card) : null,
     target: null,
     damage: null,
     guarded: 0,

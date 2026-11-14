@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { cardCost } from "../model/cardTypes.ts";
+import { cardCost, cardRarity, RARITY_LABEL } from "../model/cardTypes.ts";
 import type { CatalogCardEntry } from "../model/catalog.ts";
 
 export interface FramedCardProps {
@@ -17,8 +17,10 @@ export function FramedCard({ card, description }: FramedCardProps): ReactElement
   // Strike priority, on an amber badge atop the text (attack cards above 0).
   const raw = card.category === "attack" ? Number(card.props.priority ?? 0) : 0;
   const priority = raw > 0 ? raw : null;
+  const rarity = cardRarity(card.props);
   return (
-    <div className={`framed-card ${card.category}`}>
+    <div className={`framed-card ${card.category} rarity-${rarity}`} title={`${RARITY_LABEL[rarity]} card`}>
+      {rarity !== "normal" && <span className="framed-card-gem" aria-label={RARITY_LABEL[rarity]} />}
       {card.imageUrl ? (
         <img className="framed-card-art" src={card.imageUrl} alt={`${card.name} artwork`} loading="lazy" draggable={false} />
       ) : (

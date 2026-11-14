@@ -105,6 +105,17 @@ From the team's "Card Design" doc; see `src/model/engine.ts` for the exact rules
 - **Elements and statuses**: fire / water / electric affinity; Burn, Poison (stacks), Wet
   (electric +50%, fire −50% and dries), Acid (−DEF/ER), Slow, Blind (half damage). Water puts
   out Burn; Burn can't catch on a Wet target.
+- **Card rarity**: normal / rare / legend, by value per AP (`props.rarity`, shown on the card
+  face). Every effect is scored in damage-equivalent points (1 point = 1 damage):
+  damage / heal / lifesteal 1 each, priority +0.5 a level, interrupts +2, burn and poison
+  potency × rounds, blind 2 a round, slow 1 a round, acid potency × rounds × 0.5, wet 1,
+  ATK/DEF ±1 for a round 1, other stats 0.5, ultimate meter 0.6 a point, AP 3 each, a
+  draw or a cleanse 2, a defend that's used up on its first hit 0.9 × what it blocks (one that
+  lasts: × its rounds; percent defends assume 8 incoming damage a round), a monster
+  HP × 0.5 + ATK × 1.5 (+2 guard, +1 ability). The card costs AP × 3 + HP + meter × 0.6,
+  plus 1.5 for the card itself. Efficiency = points ÷ cost, relative to a plain 1-AP,
+  3-damage attack (1.0): below 1.4 normal, 1.4–2.0 rare, 2.0 and up legend. The weights are
+  first-pass guesses to tune with play.
 - **General cards** in every deck; **classes**: Guardian, Pyromancer, Black Mage, Master
   Craftsman, Necromancer.
 - **ATK stat**: flat bonus to attack cards (weapons, Craftsman's ultimate).

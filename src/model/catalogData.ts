@@ -11,7 +11,7 @@
 // and statuses, and there's a general card set every class gets (GENERAL_DECK
 // below). Numbers are first-pass, not tuned balance.
 
-import { CARD_CATEGORY, STACKING } from "./cardTypes.ts";
+import { CARD_CATEGORY, RARITY, STACKING, type Rarity } from "./cardTypes.ts";
 import { DAMAGE_TYPE, ELEMENT } from "./damageTypes.ts";
 import {
   MODIFIER_MODE,
@@ -172,7 +172,37 @@ const class_synergies: CatalogRows["class_synergies"] = [
   { class_id: "necromancer", synergy_id: "horde" },
 ];
 
-const cards: CatalogRows["cards"] = [
+// Rare and legend cards (every other card is normal), by value per AP -- see
+// RARITY in cardTypes.ts for how it's scored. Mirrored in the database by
+// supabase/migrations/*_card_rarity.sql.
+const RARITY_BY_CARD: Record<string, Rarity> = {
+  // Legend: 2.0+ times the value per AP of a plain attack
+  tinker: RARITY.LEGEND,
+  meditate: RARITY.LEGEND,
+  mana_tap: RARITY.LEGEND,
+  dark_pact: RARITY.LEGEND,
+  whetstone: RARITY.LEGEND,
+  riveted_plate: RARITY.LEGEND,
+  iron_skin: RARITY.LEGEND,
+  rivet_gun: RARITY.LEGEND,
+  soul_siphon: RARITY.LEGEND,
+  masterwork_blade: RARITY.LEGEND,
+  vampiric_touch: RARITY.LEGEND,
+  curse_of_weakness: RARITY.LEGEND,
+  // Rare: 1.4 to 2.0 times
+  ignite: RARITY.RARE,
+  spring_trap: RARITY.RARE,
+  ember_dart: RARITY.RARE,
+  barrier_field: RARITY.RARE,
+  bone_shield: RARITY.RARE,
+  iron_wall: RARITY.RARE,
+  hex_ward: RARITY.RARE,
+  forge_hammer: RARITY.RARE,
+  shield_bash: RARITY.RARE,
+  shield_rush: RARITY.RARE,
+};
+
+const cardRows: CatalogRows["cards"] = [
   // General -- in every class's deck
   { id: "quick_jab", name: "Quick Jab", category: ATTACK, props: { cost: 1, damageType: PHYSICAL, value: 3, priority: 1 } },
   {
@@ -422,6 +452,11 @@ const cards: CatalogRows["cards"] = [
     },
   },
 ];
+
+const cards: CatalogRows["cards"] = cardRows.map((row) => ({
+  ...row,
+  props: { ...row.props, rarity: RARITY_BY_CARD[row.id] ?? RARITY.NORMAL },
+}));
 
 // The general cards, one copy each in every class's starter deck -- that's
 // also what puts them in every class's custom-deck card pool (decks.ts).

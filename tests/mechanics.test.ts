@@ -2,8 +2,8 @@
 // interrupts, elements and statuses, monsters, and the new classes' decks.
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { createCardInstance, type Card } from "../src/model/cardTypes.ts";
-import { allClasses, findCardById, findClassById, useLocalCatalog } from "../src/model/catalog.ts";
+import { cardRarity, createCardInstance, type Card } from "../src/model/cardTypes.ts";
+import { allCards, allClasses, findCardById, findClassById, useLocalCatalog } from "../src/model/catalog.ts";
 import {
   AP_RULES,
   cardAction,
@@ -88,6 +88,18 @@ describe("new classes", () => {
     const ids = allClasses().map((c) => c.id);
     expect(ids).toEqual(expect.arrayContaining(["black_mage", "craftsman", "necromancer"]));
     for (const classDef of allClasses()) expect(validateDeckList(classDef, starterDeckList(classDef))).toBeNull();
+  });
+
+  it("gives every card a rarity", () => {
+    const counts: Record<string, number> = {};
+    for (const card of allCards()) {
+      const rarity = card.props.rarity as string;
+      expect(["normal", "rare", "legend"]).toContain(rarity);
+      counts[rarity] = (counts[rarity] ?? 0) + 1;
+    }
+    expect(counts).toEqual({ normal: allCards().length - 22, rare: 10, legend: 12 });
+    expect(cardRarity(findCardById("tinker")!.props)).toBe("legend");
+    expect(cardRarity({})).toBe("normal");
   });
 
   it("puts the general cards in every class's deck", () => {

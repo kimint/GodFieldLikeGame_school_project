@@ -8,7 +8,7 @@ import type Phaser from "phaser";
 import { COLORS, FONT_FAMILY, roundedRect } from "./theme.ts";
 import { CARD_FRAME_KEY, CARD_ICON_KEY, ULTIMATE_ICON_KEY, damageAccentColor, elementAccentColor } from "../phaserIcons.ts";
 import { loadedArtKey } from "../cardArt.ts";
-import { cardCost, type Card } from "../model/cardTypes.ts";
+import { cardCost, cardRarity, RARITY, type Card, type Rarity } from "../model/cardTypes.ts";
 import { cardPriority, describeCard, ULTIMATE_PRIORITY, type PlayRecord } from "../model/engine.ts";
 import type { DamageType, Element } from "../model/damageTypes.ts";
 
@@ -28,7 +28,15 @@ export interface CardFaceData {
   costShort?: boolean; // not enough AP left for it: the gem turns red
   description?: string | null;
   priority?: number | null; // strike priority, drawn as a badge atop the description
+  rarity?: Rarity | null; // rare / legend: a colored edge and a gem on the art window
 }
+
+// Rarity colors (normal cards draw neither the edge nor the gem).
+export const RARITY_COLOR: Record<Rarity, number> = {
+  normal: 0xc9ccd2,
+  rare: 0x4aa3ff,
+  legend: 0xff9d1a,
+};
 
 // The priority badge's colors: amber, so it reads apart from the ivory text.
 export const PRIORITY_BADGE_COLOR = 0xffb020;
@@ -45,6 +53,7 @@ export function cardFaceData(card: Card): CardFaceData {
     cost: cardCost(card),
     description: describeCard(card, { priority: false }),
     priority: cardPriority(card),
+    rarity: cardRarity(card),
   };
 }
 
@@ -63,6 +72,7 @@ export function actionFace(action: PlayRecord, ultimateName: string): CardFaceDa
     cost: action.cost ?? null,
     description: action.description,
     priority: action.priority ?? null,
+    rarity: action.rarity ?? null,
   };
 }
 
@@ -146,6 +156,37 @@ export function drawCardFace(
       const size = Math.min(art.w, art.h) * 0.45;
       container.add(scene.add.image(art.x + art.w / 2, art.y + art.h / 2, iconKey).setDisplaySize(size, size));
     }
+  }
+
+  // Rare and legend cards: a glowing edge in the rarity's color, and a gem
+  // in the art window's top-right corner (the element dot has the left).
+  const rarity = card.rarity ?? RARITY.NORMAL;
+  if (rarity !== RARITY.NORMAL) {
+    const rc = RARITY_COLOR[rarity];
+    const edge = scene.add.graphics();
+    edge.lineStyle(6 * scale, rc, 0.3);
+    edge.strokeRoundedRect(0, 0, w, h, 10 * scale);
+    edge.lineStyle(2 * scale, rc, 1);
+    edge.strokeRoundedRect(1 * scale, 1 * scale, w - 2 * scale, h - 2 * scale, 10 * scale);
+    container.add(edge);
+
+    const gx = art.x + art.w - 10 * scale;
+    const gy = art.y + 10 * scale;
+    const gr = (rarity === RARITY.LEGEND ? 7 : 6) * scale;
+    const gem = scene.add.graphics();
+    gem.fillStyle(rc, 1);
+    gem.lineStyle(Math.max(1, 1.5 * scale), 0x1a1a1a, 1);
+    gem.beginPath();
+    gem.moveTo(gx, gy - gr);
+    gem.lineTo(gx + gr * 0.8, gy);
+    gem.lineTo(gx, gy + gr);
+    gem.lineTo(gx - gr * 0.8, gy);
+    gem.closePath();
+    gem.fillPath();
+    gem.strokePath();
+    gem.fillStyle(0xffffff, 0.75);
+    gem.fillTriangle(gx, gy - gr * 0.7, gx + gr * 0.35, gy - gr * 0.05, gx - gr * 0.35, gy - gr * 0.05);
+    container.add(gem);
   }
 
   const accent = elementAccentColor(card.element) ?? damageAccentColor(card.damageType ?? undefined);
