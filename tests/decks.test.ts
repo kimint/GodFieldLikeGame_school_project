@@ -39,7 +39,15 @@ describe("deck rules", () => {
 
   it("limits copies by rarity: normal 3, rare 2, legend 1", () => {
     expect(DECK_RULES.maxCopies).toEqual({ normal: 3, rare: 2, legend: 1 });
-    const filler = [{ cardId: "heavy_slam", copies: 3 }, { cardId: "brace", copies: 2 }, { cardId: "taunt", copies: 3 }, { cardId: "purify", copies: 3 }];
+    const filler = [
+      { cardId: "heavy_slam", copies: 3 },
+      { cardId: "brace", copies: 3 },
+      { cardId: "taunt", copies: 3 },
+      { cardId: "purify", copies: 3 },
+      { cardId: "second_wind", copies: 3 },
+      { cardId: "quick_jab", copies: 3 },
+      { cardId: "splash", copies: 3 },
+    ];
     const deck = (cardId: string, copies: number) => [...filler, { cardId, copies }];
     expect(validateDeckList(guardian, deck("stone_sentinel", 3))).toBeNull(); // normal
     expect(validateDeckList(guardian, deck("stone_sentinel", 4))).toMatch(/At most 3 copies of Stone Sentinel/);
@@ -52,7 +60,13 @@ describe("deck rules", () => {
 
   it("keeps rare and legend cards within the 12-point rarity budget", () => {
     const blackMage = allClasses().find((c) => c.id === "black_mage")!;
-    const filler = [{ cardId: "shadow_bolt", copies: 3 }, { cardId: "eldritch_blast", copies: 3 }, { cardId: "acid_rain", copies: 3 }];
+    const filler = [
+      { cardId: "shadow_bolt", copies: 3 },
+      { cardId: "eldritch_blast", copies: 3 },
+      { cardId: "acid_rain", copies: 3 },
+      { cardId: "nightmare", copies: 3 },
+      { cardId: "spark", copies: 2 },
+    ];
     // 6 legends (12 points) fit...
     const legends = ["vampiric_touch", "dark_pact", "mana_tap", "curse_of_weakness", "soul_siphon", "meditate"].map((cardId) => ({ cardId, copies: 1 }));
     expect(deckRarityPoints(legends)).toBe(12);

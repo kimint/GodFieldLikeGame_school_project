@@ -20,12 +20,13 @@ export interface ClassSelectProps {
   onEditDecks: (classId: string) => void;
   onLogout: () => void;
   onOpenAccount: () => void;
-  onPlayCpu: (classId: string) => void;
+  onPlayCpu: (classId: string) => void; // App then asks which class the CPU plays
   onCreateOnline: (classId: string) => void;
   onJoinOnline: (classId: string) => void;
   onRandomOnline: (classId: string) => void;
   onOpenGallery: () => void;
   onOpenRecord: () => void;
+  onOpenClassStats: () => void;
   onOpenTutorial: () => void;
 }
 
@@ -90,13 +91,13 @@ export function ClassSelect({
   onRandomOnline,
   onOpenGallery,
   onOpenRecord,
+  onOpenClassStats,
   onOpenTutorial,
 }: ClassSelectProps): ReactElement {
   const [selectedId, setSelectedId] = useState<string>(initialClassId ?? classes[0]?.id ?? "");
   const selected = classes.find((c) => c.id === selectedId) ?? classes[0];
   const classDecks = selected ? decks.filter((d) => d.classId === selected.id) : [];
   const chosenDeckId = selected ? (selectedDeckIds[selected.id] ?? null) : null;
-
   // Gauges are relative to the best value any class has, so the bars show
   // how classes compare rather than an arbitrary scale.
   const statMax = Object.fromEntries(
@@ -119,6 +120,11 @@ export function ClassSelect({
           {account ? (
             <button type="button" className="lobby-nav-btn" onClick={onOpenRecord}>
               My record
+            </button>
+          ) : null}
+          {onlineAvailable ? (
+            <button type="button" className="lobby-nav-btn" onClick={onOpenClassStats}>
+              Class stats
             </button>
           ) : null}
           <button type="button" className="lobby-nav-btn" onClick={onOpenGallery}>

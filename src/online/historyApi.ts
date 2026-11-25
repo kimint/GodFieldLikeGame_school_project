@@ -41,9 +41,13 @@ export const RECENT_LIMIT = 5;
 export interface MatchHistoryData {
   record: PvpRecord;
   recent: HistoryEntry[]; // newest first
+  // This player's win rate with each class; null if it couldn't be loaded
+  // (e.g. the class_win_stats migration isn't applied yet).
+  classRates: ClassWinRate[] | null;
 }
 
 export async function fetchMatchHistory(): Promise<MatchHistoryData> {
+  const classRates = fetchClassWinRates("mine").catch(() => null);
   const [recordRes, recentRes] = await Promise.all([
     supabase.from("pvp_records").select("wins, draws, losses").maybeSingle(),
     supabase
@@ -65,5 +69,53 @@ export async function fetchMatchHistory(): Promise<MatchHistoryData> {
     rounds: row.rounds,
     finishedAt: row.finished_at,
   }));
-  return { record, recent };
+  return { record, recent, classRates: await classRates };
+}
+
+// --- class win rates (supabase/migrations/*_class_win_stats.sql) ---------
+
+export type WinRateMode = "pvp" | "cpu";
+
+export interface ClassWinRate {
+  classId: string;
+  mode: WinRateMode;
+  wins: number;
+  draws: number;
+  losses: number;
+  games: number;
+  winRate: number | null; // percent, draws counting half; null with no games
+}
+
+interface ClassWinRateRow {
+  class_id: string;
+  mode: WinRateMode;
+  wins: number;
+  draws: number;
+  losses: number;
+  games: number;
+  win_rate: number | string | null; // numeric comes back as a string
+}
+
+// All-time win rate per class, PvP and vs-CPU: "all" = every player's games,
+// "mine" = the logged-in player's own.
+export async function fetchClassWinRates(scope: "all" | "mine"): Promise<ClassWinRate[]> {
+  const { data, error } = await supabase
+    .from(scope === "all" ? "class_win_rates" : "my_class_win_rates")
+    .select("class_id, mode, wins, draws, losses, games, win_rate");
+  if (error) throw new Error(error.message);
+  return (data as ClassWinRateRow[]).map((row) => ({
+    classId: row.class_id,
+    mode: row.mode,
+    wins: row.wins,
+    draws: row.draws,
+    losses: row.losses,
+    games: row.games,
+    winRate: row.win_rate === null ? null : Number(row.win_rate),
+  }));
+}
+
+// Count a finished vs-CPU game toward the player's class (logged in only).
+export async function recordCpuGame(classId: string, result: MatchResult): Promise<void> {
+  const { error } = await supabase.rpc("record_cpu_game", { p_class: classId, p_result: result });
+  if (error) throw new Error(error.message);
 }

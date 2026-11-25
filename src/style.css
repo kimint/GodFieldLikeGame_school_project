@@ -1534,6 +1534,131 @@ body {
   color: var(--rc-muted);
 }
 
+/* Class win rates (all players), full width under the two cards */
+.class-rates {
+  grid-column: 1 / -1;
+}
+
+.class-rate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+.class-rate-table th,
+.class-rate-table td {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.class-rate-table thead th {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rc-muted);
+}
+
+.class-rate-table tbody th {
+  font-weight: 600;
+}
+
+.class-rate-table td strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.class-rate-games,
+.class-rate-empty {
+  color: var(--rc-muted);
+  font-size: 14px;
+}
+
+/* "Class stats" page: every class's win rate, all players */
+.class-stats-modes {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 20px 0 14px;
+}
+
+.class-stats-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.class-stats-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(0, 3fr) 70px minmax(120px, auto);
+  align-items: center;
+  gap: 16px;
+  padding: 14px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.class-stats-name {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.class-stats-bar {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.class-stats-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(to right, rgba(226, 197, 136, 0.55), #e2c588);
+  transition: width 0.4s ease;
+}
+
+.class-stats-even {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 50%;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.class-stats-rate {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.class-stats-wdl {
+  color: var(--rc-muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.class-stats-total {
+  margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+  .class-stats-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .class-stats-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .class-stats-wdl {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 720px) {
   .history-panel {
     grid-template-columns: 1fr;
@@ -2537,6 +2662,41 @@ body {
     0 0 0 3px rgba(226, 197, 136, 0.14),
     0 0 26px rgba(226, 185, 100, 0.3);
   text-shadow: 0 0 16px rgba(226, 185, 100, 0.45);
+}
+
+.dialog-choices {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.dialog-choice {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: #ddd6c9;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.dialog-choice:hover {
+  border-color: rgba(226, 197, 136, 0.5);
+}
+
+.dialog-choice.selected {
+  border-color: #e2c588;
+  color: #fff;
+  background: rgba(226, 197, 136, 0.14);
+}
+
+.dialog-choice:first-child {
+  grid-column: 1 / -1;
 }
 
 .dialog-buttons {

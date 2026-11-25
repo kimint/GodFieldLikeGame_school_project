@@ -6,6 +6,7 @@ import { ClassSelect } from "../components/ClassSelect.tsx";
 import { DeckBuilder } from "../components/DeckBuilder.tsx";
 import { Gallery } from "../components/Gallery.tsx";
 import { MatchHistory } from "../components/MatchHistory.tsx";
+import { ClassStats } from "../components/ClassStats.tsx";
 import { AccountSettings } from "../components/AccountSettings.tsx";
 import { PhaserTutorial } from "../components/PhaserTutorial.tsx";
 import { Lobby } from "../components/Lobby.tsx";
@@ -20,7 +21,8 @@ import type { ClassDef } from "../model/classes.ts";
 import { onlineAvailable } from "../online/supabaseClient.ts";
 import { logOut, markTutorialSeen } from "../online/authApi.ts";
 import { listDecks, type SavedDeck } from "../online/decksApi.ts";
-import { fetchMatchHistory, type MatchHistoryData } from "../online/historyApi.ts";
+import { fetchMatchHistory, recordCpuGame, type MatchHistoryData } from "../online/historyApi.ts";
+import type { FinishedGame } from "../scenes/BattleScene.ts";
 
 // The deck a player takes into a match: a saved deck, or the starter deck
 // (id null, list null).
@@ -37,7 +39,8 @@ type Screen =
   | { name: "account" }
   | { name: "tutorial" }
   | { name: "decks"; classId: string }
-  | { name: "battle"; playerClassId: string; deck: DeckChoice }
+  | { name: "battle"; playerClassId: string; cpuClassId: string | null; deck: DeckChoice }
+  | { name: "class-stats" }
   | { name: "lobby-create"; playerClass: ClassDef; deck: DeckChoice }
   | { name: "lobby-join"; playerClass: ClassDef; deck: DeckChoice; code: string }
   | { name: "lobby-random"; playerClass: ClassDef; deck: DeckChoice }
@@ -83,6 +86,18 @@ export function App(): ReactElement {
       setHistoryError((err as Error).message);
     }
   }, [accountId]);
+
+  // A finished vs-CPU game counts toward its class's win rate (logged in
+  // only). A failed write only costs the stat, not the game.
+  const onCpuGameOver = useCallback(
+    (game: FinishedGame): void => {
+      if (!accountId) return;
+      recordCpuGame(game.playerClassId, game.result)
+        .then(() => reloadHistory())
+        .catch((err: Error) => console.warn("Couldn't record the vs-CPU game:", err.message));
+    },
+    [accountId, reloadHistory]
+  );
 
   // A different (or no) account: drop the old one's decks and history and go back to the menu.
   useEffect(() => {
@@ -167,6 +182,25 @@ export function App(): ReactElement {
     if (deck) go(playerClass, deck);
   };
 
+  // Play vs CPU: pick the CPU's class (or a random one), then the match starts.
+  const askCpuClass = (playerClass: ClassDef, deck: DeckChoice): void => {
+    setDialog({
+      kind: "choice",
+      title: "Choose your opponent",
+      message: `Which class should the CPU play against your ${playerClass.name}?`,
+      options: [
+        { value: "", label: "Random" },
+        ...catalog.classes.map((c) => ({ value: c.id, label: c.name })),
+      ],
+      confirmLabel: "Start match",
+      onConfirm: (cpuClassId) => {
+        setDialog(null);
+        setScreen({ name: "battle", playerClassId: playerClass.id, cpuClassId: cpuClassId || null, deck });
+      },
+      onCancel: () => setDialog(null),
+    });
+  };
+
   const askJoinCode = (playerClass: ClassDef, deck: DeckChoice): void => {
     setDialog({
       kind: "prompt",
@@ -220,6 +254,9 @@ export function App(): ReactElement {
     case "tutorial":
       body = <PhaserTutorial onExit={toMenu} onAccountSettings={toAccount} />;
       break;
+    case "class-stats":
+      body = <ClassStats onBack={toMenu} />;
+      break;
     case "record":
       body = (
         <MatchHistory
@@ -259,6 +296,8 @@ export function App(): ReactElement {
         <PhaserBattle
           playerClassId={screen.playerClassId}
           playerDeckList={screen.deck.list}
+          cpuClassId={screen.cpuClassId}
+          onGameOver={onCpuGameOver}
           onExit={toMenu}
           onAccountSettings={toAccount}
         />
@@ -326,9 +365,7 @@ export function App(): ReactElement {
           }}
           onLogout={logOutNow}
           onOpenAccount={() => setScreen({ name: "account" })}
-          onPlayCpu={(classId) =>
-            startWith(classId, (playerClass, deck) => setScreen({ name: "battle", playerClassId: playerClass.id, deck }))
-          }
+          onPlayCpu={(classId) => startWith(classId, askCpuClass)}
           onCreateOnline={(classId) =>
             startWith(classId, (playerClass, deck) => setScreen({ name: "lobby-create", playerClass, deck }))
           }
@@ -338,6 +375,7 @@ export function App(): ReactElement {
           }
           onOpenGallery={() => setScreen({ name: "gallery" })}
           onOpenRecord={() => setScreen({ name: "record" })}
+          onOpenClassStats={() => setScreen({ name: "class-stats" })}
           onOpenTutorial={() => setScreen({ name: "tutorial" })}
         />
       );

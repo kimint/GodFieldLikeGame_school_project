@@ -92,13 +92,13 @@ const classes: CatalogRows["classes"] = [
   {
     id: "guardian",
     name: "Guardian",
-    base_stats: { hp: 44, def: 6, mr: 2, er: 2, ur: 6, crit: 0, atk: 1 },
+    base_stats: { hp: 40, def: 6, mr: 2, er: 2, ur: 6, crit: 0, atk: 1 },
     ultimate: {
       id: "guardian_ultimate",
       name: "Unbreakable Bastion",
       description: "The Guardian becomes an unbreakable wall and crashes forward: 14 damage.",
       imageUrl: "/cards/guardian_ultimate.jpg",
-      cost: 24,
+      cost: 30,
       damage: 14,
     },
     passives: [],
@@ -113,7 +113,7 @@ const classes: CatalogRows["classes"] = [
       name: "Cataclysm",
       description: "The sky splits and rains fire: 18 damage.",
       imageUrl: "/cards/pyromancer_ultimate.jpg",
-      cost: 20,
+      cost: 25,
       damage: 18,
     },
     passives: [],
@@ -128,7 +128,7 @@ const classes: CatalogRows["classes"] = [
       name: "Eclipse",
       description: "14 damage, and the darkness mends the caster for 8.",
       imageUrl: "/cards/black_mage_ultimate.jpg",
-      cost: 22,
+      cost: 26,
       damage: 14,
       effects: [heal(8)],
       duration: 1,
@@ -139,13 +139,13 @@ const classes: CatalogRows["classes"] = [
   {
     id: "craftsman",
     name: "Master Craftsman",
-    base_stats: { hp: 36, def: 4, mr: 2, er: 0, ur: 5, crit: 0, atk: 3 },
+    base_stats: { hp: 41, def: 4, mr: 2, er: 0, ur: 5, crit: 0, atk: 3 },
     ultimate: {
       id: "craftsman_ultimate",
       name: "Masterpiece",
       description: "6 damage, then ATK +4 for 3 rounds.",
       imageUrl: "/cards/craftsman_ultimate.jpg",
-      cost: 16,
+      cost: 24,
       damage: 6,
       effects: [statModifier("atk", FLAT, 4)],
       duration: 3,
@@ -156,13 +156,13 @@ const classes: CatalogRows["classes"] = [
   {
     id: "necromancer",
     name: "Necromancer",
-    base_stats: { hp: 45, def: 2, mr: 5, er: 3, ur: 7, crit: 0, atk: 3 },
+    base_stats: { hp: 38, def: 2, mr: 5, er: 3, ur: 7, crit: 0, atk: 3 },
     ultimate: {
       id: "necromancer_ultimate",
       name: "Army of the Dead",
       description: "8 damage, and two Skeletons rise.",
       imageUrl: "/cards/necromancer_ultimate.jpg",
-      cost: 20,
+      cost: 27,
       damage: 8,
       effects: [summon("raise_skeleton", 2)],
       duration: 1,
@@ -220,7 +220,7 @@ const cardRows: CatalogRows["cards"] = [
     props: { cost: 1, damageType: MAGIC, element: ELEMENT.WATER, value: 2, applies: [applyStatus(STATUS.WET, 1, 2)] },
   },
   { id: "spark", name: "Spark", category: ATTACK, props: { cost: 1, damageType: MAGIC, element: ELEMENT.ELECTRIC, value: 3 } },
-  { id: "healing_potion", name: "Healing Potion", category: BUFF, props: { cost: 2, effects: [heal(6)], duration: 1 } },
+  { id: "healing_potion", name: "Healing Potion", category: BUFF, props: { cost: 4, effects: [heal(8)], duration: 1 } },
   { id: "meditate", name: "Meditate", category: BUFF, props: { cost: 0, uaCharge: 4, effects: [energyRegen(FLAT, 2)], duration: 2 } },
   { id: "smoke_bomb", name: "Smoke Bomb", category: DEBUFF, props: { cost: 2, effects: [applyStatus(STATUS.BLIND, 1, 2)], duration: 2 } },
 
@@ -253,7 +253,7 @@ const cardRows: CatalogRows["cards"] = [
   },
   { id: "second_wind", name: "Second Wind", category: BUFF, props: { cost: 1, effects: [energyRegen(FLAT, 2)], duration: 3 } },
   { id: "iron_skin", name: "Iron Skin", category: BUFF, props: { cost: 2, effects: [statModifier("def", FLAT, 4)], duration: 3 } },
-  { id: "purify", name: "Purify", category: BUFF, props: { cost: 2, effects: [cleanse(), heal(3)], duration: 1 } },
+  { id: "purify", name: "Purify", category: BUFF, props: { cost: 3, effects: [cleanse(), heal(2)], duration: 1 } },
   { id: "taunt", name: "Taunt", category: DEBUFF, props: { cost: 1, effects: [meterSiphon(5)], duration: 1 } },
   {
     id: "stone_sentinel",
@@ -521,6 +521,7 @@ const CLASS_DECKS: Record<string, Record<string, number>> = {
     tinker: 0, // in the pool, not the starter deck (rarity budget)
     caltrops: 3,
     clockwork_golem: 3,
+    quick_jab: 2, // a general card: more than its usual 1 copy (20-card minimum)
   },
   necromancer: {
     bone_spear: 2,
@@ -538,7 +539,8 @@ const CLASS_DECKS: Record<string, Record<string, number>> = {
 
 const class_deck_cards: CatalogRows["class_deck_cards"] = Object.entries(CLASS_DECKS).flatMap(([classId, deck]) => [
   ...Object.entries(deck).map(([cardId, copies]) => ({ class_id: classId, card_id: cardId, copies })),
-  ...GENERAL_DECK.map((cardId) => ({ class_id: classId, card_id: cardId, copies: 1 })),
+  // A class deck can list a general card to give it more than 1 copy.
+  ...GENERAL_DECK.filter((cardId) => !(cardId in deck)).map((cardId) => ({ class_id: classId, card_id: cardId, copies: 1 })),
 ]);
 
 export const LOCAL_CATALOG_ROWS: CatalogRows = { synergies, classes, class_synergies, cards, class_deck_cards };

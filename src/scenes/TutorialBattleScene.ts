@@ -337,11 +337,13 @@ const SCRIPT: ScriptedRound[] = [
       {
         id: "ult",
         title: "Ultimate",
-        text: () =>
-          "Your ultimate is charged!\n\nClick your class badge to add it to this turn. It costs no AP.",
+        text: (s) =>
+          s.targeting?.kind === "ultimate"
+            ? `Aim it at the ${DUMMY_LABEL}.\n\nLike an attack card, your ultimate hits the target you pick.`
+            : "Your ultimate is charged!\n\nClick your class badge to add it to this turn. It costs no AP.",
         allow: { kind: "ultimate" },
         done: (s) => s.stagedUltimate,
-        focus: () => LAYOUT.classBadge,
+        focus: (s) => (s.targeting?.kind === "ultimate" ? LAYOUT.cpuStrip : LAYOUT.classBadge),
       },
       {
         id: "imp-attack",
@@ -440,6 +442,9 @@ export class TutorialBattleScene extends BattleScene {
     player.hand = round.hand.map(cardInstance);
     cpu.hand = ["ember_dart", "ember_dart", "fire_lance", "flame_imp", "heat_shroud", "scorch"].map(cardInstance);
     cpu.ultimateMeter = 0;
+    // The script says the ultimate is charged from round 4 on, whatever its
+    // cost is tuned to.
+    if (this.battle.round >= 4) player.ultimateMeter = Math.max(player.ultimateMeter, player.classDef.ultimate.cost);
   }
 
   create(data: BattleSceneData): void {

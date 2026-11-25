@@ -18,7 +18,7 @@ import type { ClassDef } from "./classes.ts";
 import { shuffle } from "./util.ts";
 
 export const DECK_RULES = {
-  minCards: 12,
+  minCards: 20,
   maxCards: 24,
   // Copies of one card, by its rarity.
   maxCopies: { normal: 3, rare: 2, legend: 1 } as Readonly<Record<Rarity, number>>,

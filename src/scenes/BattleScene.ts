@@ -20,6 +20,7 @@ import {
   orderNeedsTarget,
   orderCost,
   targetProblem,
+  ultimateNeedsTarget,
   describeAbility,
   passAction,
   playRound,
@@ -422,10 +423,21 @@ export const LAYOUT = {
   logHideDx: LOG_HIDE_DX,
 } as const;
 
+// A finished vs-CPU game, from the player's side.
+export interface FinishedGame {
+  playerClassId: string;
+  cpuClassId: string;
+  result: "win" | "loss" | "draw";
+  rounds: number;
+}
+
 export interface BattleSceneData {
   playerClass: ClassDef;
+  cpuClass?: ClassDef | null; // the class the CPU plays (vs-CPU); null/absent = a random other class
   playerDeck?: Card[] | null; // a custom deck (decks.ts); null/absent = starter deck
   onExit?: (() => void) | null;
+  // Called once when a vs-CPU game ends (for the class win-rate stats).
+  onGameOver?: ((game: FinishedGame) => void) | null;
   onAccountSettings?: (() => void) | null; // leave the match and open Account settings; null = no account
 }
 
@@ -454,6 +466,8 @@ export class BattleScene extends Phaser.Scene {
   battle!: Battle;
   onExit: (() => void) | null = null;
   onAccountSettings: (() => void) | null = null;
+  onGameOver: ((game: FinishedGame) => void) | null = null;
+  gameReported = false;
   recapPlaying = false;
   recapRun: RoundRecapRun | null = null; // active recap (speed/skip control) -- see roundRecap.ts
   shownHp: HpPair | null = null; // { player, cpu } while a recap is counting HP down
@@ -492,9 +506,14 @@ export class BattleScene extends Phaser.Scene {
   staged: Card[] = [];
   stagedUltimate = false;
   stagedTargets: Record<number, Target> = {}; // attack card id -> who it's aimed at
+  stagedUltimateTarget: Target | null = null; // who the staged ultimate is aimed at
   orders: MonsterOrder[] = []; // this turn's orders for your monsters
-  // Picking a target: for an attack card being played, or a monster order.
-  targeting: { kind: "card"; card: Card } | { kind: "order"; uid: number; use: MonsterOrder["use"] } | null = null;
+  // Picking a target: for an attack card being played, a monster order, or the ultimate.
+  targeting:
+    | { kind: "card"; card: Card }
+    | { kind: "order"; uid: number; use: MonsterOrder["use"] }
+    | { kind: "ultimate" }
+    | null = null;
   monsterMenuUid: number | null = null; // your monster whose command menu is open
   previewedCardId: number | null = null; // hand card shown big in the middle, waiting for a confirm click
   previewLayer!: Phaser.GameObjects.Container; // the center preview, above everything else
@@ -583,7 +602,8 @@ export class BattleScene extends Phaser.Scene {
 
   setupBattle(data: BattleSceneData): Battle {
     const playerClass = data.playerClass;
-    const cpuClass = allClasses().find((c) => c.id !== playerClass.id) ?? playerClass;
+    const others = allClasses().filter((c) => c.id !== playerClass.id);
+    const cpuClass = data.cpuClass ?? others[Math.floor(Math.random() * others.length)] ?? playerClass;
     return createBattle(playerClass, cpuClass, { playerDeck: data.playerDeck ?? null });
   }
 
@@ -654,6 +674,7 @@ export class BattleScene extends Phaser.Scene {
     this.previewedCardId = null;
     this.staged = [];
     this.stagedUltimate = false;
+    this.stagedUltimateTarget = null;
     this.stagedTargets = {};
     this.orders = [];
     this.targeting = null;
@@ -790,6 +811,8 @@ export class BattleScene extends Phaser.Scene {
     useRenderScale(this);
     this.onExit = data.onExit ?? null;
     this.onAccountSettings = data.onAccountSettings ?? null;
+    this.onGameOver = data.onGameOver ?? null;
+    this.gameReported = false;
     this.recapPlaying = false;
     this.clearPlanning();
     this.pendingTurn = null;
@@ -1087,6 +1110,12 @@ export class BattleScene extends Phaser.Scene {
     this.targeting = null;
     if (!targeting) return this.render();
     if (targeting.kind === "card") return this.stageCard(targeting.card, target);
+    if (targeting.kind === "ultimate") {
+      this.stagedUltimate = true;
+      this.stagedUltimateTarget = target;
+      playSfx("card");
+      return this.render();
+    }
     this.orders = [...this.orders.filter((o) => o.uid !== targeting.uid), { uid: targeting.uid, use: targeting.use, target }];
     playSfx("card");
     this.render();
@@ -1104,7 +1133,10 @@ export class BattleScene extends Phaser.Scene {
     const orders: MonsterOrder[] = [];
     for (const order of this.orders) if (!checkPlan(player, kept, false, [...orders, order]).problem) orders.push(order);
     this.orders = orders;
-    if (this.stagedUltimate && checkPlan(player, kept, true, orders).problem) this.stagedUltimate = false;
+    if (this.stagedUltimate && checkPlan(player, kept, true, orders).problem) {
+      this.stagedUltimate = false;
+      this.stagedUltimateTarget = null;
+    }
   }
 
   // A picked card was clicked on the arena slot: take it back. Cards picked
@@ -1149,11 +1181,18 @@ export class BattleScene extends Phaser.Scene {
     this.render();
   }
 
-  // Ultimate is a toggle: it joins this turn when it's ended.
+  // Ultimate is a toggle: it joins this turn when it's ended. Turning it on
+  // aims it first, like an attack card.
   onUltimateClick(): void {
     if (!this.canAct()) return;
-    if (!this.stagedUltimate && checkPlan(this.battle.player, this.staged, true, this.orders).problem) return;
-    this.stagedUltimate = !this.stagedUltimate;
+    if (this.stagedUltimate) {
+      this.stagedUltimate = false;
+      this.stagedUltimateTarget = null;
+      return this.render();
+    }
+    if (checkPlan(this.battle.player, this.staged, true, this.orders).problem) return;
+    if (ultimateNeedsTarget(this.battle.player)) return this.startTargeting({ kind: "ultimate" });
+    this.stagedUltimate = true;
     this.render();
   }
 
@@ -1161,6 +1200,7 @@ export class BattleScene extends Phaser.Scene {
     if (!this.canAct()) return;
     const action = planAction(this.battle.player, this.staged.map((c) => c.id), this.stagedUltimate, {
       targets: this.stagedTargets,
+      ultimateTarget: this.stagedUltimateTarget,
       orders: this.orders,
       opponent: this.battle.cpu,
     });
@@ -1240,6 +1280,15 @@ export class BattleScene extends Phaser.Scene {
     if (this.resultLayer || this.resultDismissed) return;
     const b = this.battle;
     const kind = b.draw ? "draw" : b.winner === b.player ? "win" : "lose";
+    if (!this.gameReported) {
+      this.gameReported = true;
+      this.onGameOver?.({
+        playerClassId: b.player.classDef.id,
+        cpuClassId: b.cpu.classDef.id,
+        result: kind === "lose" ? "loss" : kind,
+        rounds: b.round,
+      });
+    }
     const result = RESULT[kind];
     const tone = RESULT_TONES[kind];
     const cx = GAME_WIDTH / 2;
@@ -2809,6 +2858,8 @@ export class BattleScene extends Phaser.Scene {
     let what: string;
     if (targeting.kind === "card") {
       what = targeting.card.name;
+    } else if (targeting.kind === "ultimate") {
+      what = `your ultimate, ${ultimateName(this.battle.player.classDef)}`;
     } else {
       const monster = this.battle.player.field.find((m) => m.uid === targeting.uid);
       what = `${monster?.name ?? "your monster"}'s ${targeting.use === "attack" ? "attack" : (monster?.ability?.name ?? "ability")}`;
@@ -2998,7 +3049,7 @@ export class BattleScene extends Phaser.Scene {
           bg.disableInteractive();
         }
         this.slotsContainer.add(container);
-        const target = cardId !== null && !pending ? this.stagedTargets[cardId] : undefined;
+        const target = pending ? undefined : cardId !== null ? this.stagedTargets[cardId] : (this.stagedUltimateTarget ?? undefined);
         if (target) {
           this.slotsContainer.add(
             this.add

@@ -180,6 +180,31 @@ describe("AP and multi-card turns", () => {
     expect(plays(b.player).map((p) => p.kind)).toEqual(["card", "ultimate"]);
   });
 
+  it("aims the ultimate like an attack card", () => {
+    const b = freshBattle("pyromancer", "necromancer");
+    resolveRound(b, NOTHING, play(b.cpu, "raise_skeleton"));
+    const skeleton = b.cpu.field[0]!;
+    b.player.ultimateMeter = b.player.classDef.ultimate.cost;
+    const hp = b.cpu.hp;
+    const target: Target = { kind: "monster", uid: skeleton.uid };
+    const action = planAction(b.player, [], true, { ultimateTarget: target, opponent: b.cpu });
+    expect(action?.ultimateTarget).toEqual(target);
+    resolveRound(b, action!, NOTHING);
+    expect(b.cpu.hp).toBe(hp); // the fighter is untouched
+    expect(b.cpu.field).toHaveLength(0);
+    expect(plays(b.player).find((p) => p.kind === "ultimate")?.fieldHits[0]?.killed).toBe(true);
+  });
+
+  it("makes the ultimate hit a guard first, and keeps its target over the wire", () => {
+    const b = freshBattle("pyromancer", "necromancer");
+    resolveRound(b, NOTHING, play(b.cpu, "grave_guard"));
+    b.player.ultimateMeter = b.player.classDef.ultimate.cost;
+    expect(planAction(b.player, [], true, { ultimateTarget: { kind: "fighter" }, opponent: b.cpu })).toBeNull();
+    const guard = b.cpu.field[0]!;
+    const action = planAction(b.player, [], true, { ultimateTarget: { kind: "monster", uid: guard.uid }, opponent: b.cpu })!;
+    expect(fromClientAction(b.player, b.cpu, toClientAction(action))?.ultimateTarget).toEqual({ kind: "monster", uid: guard.uid });
+  });
+
   it("adds a card's ultimate charge to the meter", () => {
     const b = freshBattle("craftsman");
     const regen = b.player.classDef.baseStats.ur;

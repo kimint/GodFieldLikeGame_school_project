@@ -376,6 +376,14 @@ async function playEffect(
 
   if (action.kind === "ultimate") {
     await playUltimate(run, side, target, from);
+    // Aimed at a monster (or taken by a guard): it lands on the field.
+    const fieldHits = action.fieldHits ?? [];
+    if (fieldHits.length > 0) {
+      await monsterDamage(run, target.fieldCenter(), fieldHits);
+      const killed = fieldHits.filter((h) => h.killed).length;
+      const text = `Hit ${fieldHits.map((h) => h.target).join(", ")}${killed ? ` (${killed} destroyed)` : ""}`;
+      return withExtras(run, side, action, { text, color: EFFECT_COLOR.hit });
+    }
     const result = hit(run, target, action, { quiet: true });
     return withExtras(run, side, action, result);
   }

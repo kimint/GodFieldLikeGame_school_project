@@ -81,6 +81,10 @@ export const AP_RULES = {
 export const FIELD_SIZE = 3; // monsters per side
 export const ULTIMATE_PRIORITY = 1;
 
+// Relative odds of drawing a card by its rarity (see drawCard): normal cards
+// come up more often, legends more rarely.
+export const DRAW_WEIGHT: Readonly<Record<Rarity, number>> = { normal: 3, rare: 2, legend: 1 };
+
 // A card's strike priority, for showing on its face: an attack card's
 // `priority` when it has one above 0, else null.
 export function cardPriority(card: Card): number | null {
@@ -284,7 +288,14 @@ function drawCard(fighter: Fighter): Card | null {
     fighter.deck = shuffle(fighter.discard);
     fighter.discard = [];
   }
-  return fighter.deck.pop() ?? null;
+  // Weighted by rarity (DRAW_WEIGHT), wherever a card sits in the pile.
+  const weights = fighter.deck.map((card) => DRAW_WEIGHT[cardRarity(card)]);
+  let roll = random() * weights.reduce((sum, w) => sum + w, 0);
+  for (let i = fighter.deck.length - 1; i >= 0; i--) {
+    roll -= weights[i] ?? 0;
+    if (roll < 0 || i === 0) return fighter.deck.splice(i, 1)[0] ?? null;
+  }
+  return null;
 }
 
 function drawUpTo(fighter: Fighter, size = HAND_SIZE): void {
@@ -351,6 +362,7 @@ export interface Action {
   cards: Card[];
   ultimate: boolean;
   targets?: Record<number, Target>; // attack card instance id -> its target
+  ultimateTarget?: Target | null; // who the ultimate is aimed at (like an attack card)
   orders?: MonsterOrder[];
 }
 
@@ -360,6 +372,7 @@ export interface ClientAction {
   cardIds: number[];
   ultimate: boolean;
   targets?: Record<string, Target>;
+  ultimateTarget?: Target | null;
   orders?: MonsterOrder[];
 }
 
@@ -376,6 +389,12 @@ function selfEffects(card: Card): Effect[] {
 // Attack cards aimed at a single target (not the "field" sweeps).
 export function cardNeedsTarget(card: Card): boolean {
   return card.category === CARD_CATEGORY.ATTACK && card.target !== "field";
+}
+
+// An ultimate that deals damage is aimed like an attack card: the enemy
+// fighter or one of their monsters (a guard has to be hit first).
+export function ultimateNeedsTarget(fighter: Fighter): boolean {
+  return (fighter.classDef.ultimate.damage ?? 0) > 0;
 }
 
 // Whether a monster order hits something, so needs a target.
@@ -460,6 +479,7 @@ export function canPlayCard(fighter: Fighter, card: Card, picked: Card[] = [], o
 
 export interface PlanOptions {
   targets?: Record<number, Target>;
+  ultimateTarget?: Target | null;
   orders?: MonsterOrder[];
   // Needed to check the targets; without it they're taken as given.
   opponent?: Fighter;
@@ -505,7 +525,12 @@ export function planAction(fighter: Fighter, cardIds: number[], ultimate = false
     if (!target) return null;
     order.target = target;
   }
-  return { cards, ultimate, targets, orders };
+  let ultimateTarget: Target | null = null;
+  if (ultimate && ultimateNeedsTarget(fighter)) {
+    ultimateTarget = aim(options.ultimateTarget);
+    if (!ultimateTarget) return null;
+  }
+  return { cards, ultimate, targets, ultimateTarget, orders };
 }
 
 // Shorthands: a turn of just one card, just the ultimate, or nothing.
@@ -526,6 +551,7 @@ export function toClientAction(action: Action): ClientAction {
     cardIds: action.cards.map((c) => c.id),
     ultimate: action.ultimate,
     targets: Object.fromEntries(Object.entries(action.targets ?? {})),
+    ultimateTarget: action.ultimateTarget ?? null,
     orders: action.orders ?? [],
   };
 }
@@ -537,7 +563,12 @@ export function fromClientAction(fighter: Fighter, opponent: Fighter, action: Cl
   const targets: Record<number, Target> = {};
   for (const [id, target] of Object.entries(action.targets ?? {})) targets[Number(id)] = target;
   const orders = Array.isArray(action.orders) ? action.orders : [];
-  return planAction(fighter, action.cardIds.map(Number), Boolean(action.ultimate), { targets, orders, opponent });
+  return planAction(fighter, action.cardIds.map(Number), Boolean(action.ultimate), {
+    targets,
+    ultimateTarget: action.ultimateTarget ?? null,
+    orders,
+    opponent,
+  });
 }
 
 // --- statuses, monsters, and hitting things ------------------------------
@@ -786,13 +817,26 @@ function commitCardHousekeeping(actor: Fighter, card: Card): void {
   actor.discard.push(card);
 }
 
-function useUltimate(actor: Fighter, opponent: Fighter, play: PlayRecord, round: number): HitResult {
+// The ultimate's damage lands on its target like an attack card's would (a
+// guard monster takes it first), but ignores defends and resistances.
+function useUltimate(actor: Fighter, opponent: Fighter, play: PlayRecord, round: number, target: Target | null): HitResult {
   const ultimate = actor.classDef.ultimate;
   actor.ultimateMeter -= ultimate.cost;
   const damage = ultimate.damage ?? 0;
-  opponent.hp = Math.max(0, opponent.hp - damage);
+  let dealt = 0;
+  if (damage > 0) {
+    const monster = landingMonster(opponent, target);
+    if (monster) {
+      play.target = monster.name;
+      play.fieldHits.push(damageMonster(opponent, monster, damage));
+    } else {
+      play.target = "fighter";
+      opponent.hp = Math.max(0, opponent.hp - damage);
+      dealt = damage;
+    }
+  }
   if (ultimate.effects?.length) applyEffects(actor, actor, ultimate.effects, ultimate.duration ?? 3, play, round);
-  return { damage, guarded: 0, resisted: 0 };
+  return { damage: dealt, guarded: 0, resisted: 0 };
 }
 
 // Tick every duration a fighter is carrying (active defends, temporary
@@ -961,7 +1005,10 @@ export function chooseAiAction(cpu: Fighter, opponent: Fighter): Action {
 
   const targets: Record<number, Target> = {};
   for (const card of picked) if (cardNeedsTarget(card)) targets[card.id] = cpuTarget(opponent, (card as AttackCard).value);
-  return { cards: picked, ultimate: checkPlan(cpu, picked, true, orders).problem === null, targets, orders };
+  const ultimate = checkPlan(cpu, picked, true, orders).problem === null;
+  // The ultimate is too big to spend on a monster unless a guard forces it.
+  const ultimateTarget = ultimate && ultimateNeedsTarget(cpu) ? defaultTarget(opponent) : null;
+  return { cards: picked, ultimate, targets, ultimateTarget, orders };
 }
 
 // The CPU's aim: a guard if it has to; otherwise, sometimes, a monster this
@@ -1137,9 +1184,15 @@ function resolveDamagePhase(battle: Battle, sides: [Side, Side]): void {
       return;
     }
     if (!card) {
-      const hit = useUltimate(actor, opponent, play, battle.round);
+      const hit = useUltimate(actor, opponent, play, battle.round, side.action.ultimateTarget ?? null);
       play.damage = hit.damage;
-      addLog(battle, `${fighterName(actor)} unleashes its ultimate for ${hit.damage} damage!`);
+      const onMonster = play.fieldHits[0];
+      addLog(
+        battle,
+        onMonster
+          ? `${fighterName(actor)} unleashes its ultimate on ${onMonster.target} for ${onMonster.damage} damage!`
+          : `${fighterName(actor)} unleashes its ultimate for ${hit.damage} damage!`
+      );
       return;
     }
     const hit = resolveAttackCard(actor, opponent, card, play, side.action.targets?.[card.id] ?? null);

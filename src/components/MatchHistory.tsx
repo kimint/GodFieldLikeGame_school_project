@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import { findClassById } from "../model/catalog.ts";
 import { RECENT_LIMIT, type HistoryEntry, type MatchHistoryData } from "../online/historyApi.ts";
+import { ClassRateTable } from "./ClassStats.tsx";
 
 const RESULT_LABEL: Record<HistoryEntry["result"], string> = { win: "W", draw: "D", loss: "L" };
 
@@ -110,6 +111,7 @@ function HistoryPanel({ history }: { history: MatchHistoryData | null }): ReactE
           </ul>
         )}
       </div>
+      <ClassRateTable title="Your win rate by class" rates={history ? history.classRates : undefined} />
     </section>
   );
 }
