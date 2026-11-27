@@ -1335,7 +1335,12 @@ export class BattleScene extends Phaser.Scene {
       { label: "You", f: b.player },
       { label: this.displayName(b.cpu), f: b.cpu },
     ].map(({ label, f }, i) => this.drawResultHpTile(cx - tileW - tileGap / 2 + i * (tileW + tileGap), y, tileW, tileH, label, f));
-    y += tileH + 30;
+    y += tileH + 20;
+
+    // Anything a subclass adds under the HP tiles (online: the Gold reward).
+    const extra = this.drawResultExtra(cx, y, tileW * 2 + tileGap);
+    if (extra) y += extra.height + 20;
+    y += 10;
 
     // The buttons, centered side by side: the first is the main action.
     const actions = this.resultActions();
@@ -1365,6 +1370,7 @@ export class BattleScene extends Phaser.Scene {
       title,
       summary.container,
       ...tiles,
+      ...(extra?.objects ?? []),
       ...this.resultButtons.map((btn) => btn.container),
       note,
     ]);
@@ -1372,7 +1378,13 @@ export class BattleScene extends Phaser.Scene {
     layer.add(panel);
 
     // Entrance: the panel rises in, the title settles, then the details.
-    const details: Phaser.GameObjects.GameObject[] = [summary.container, ...tiles, ...this.resultButtons.map((btn) => btn.container), note];
+    const details: Phaser.GameObjects.GameObject[] = [
+      summary.container,
+      ...tiles,
+      ...(extra?.objects ?? []),
+      ...this.resultButtons.map((btn) => btn.container),
+      note,
+    ];
     let revealed = false;
     const reveal = (backdrop: Phaser.GameObjects.Image | null): void => {
       if (revealed || this.resultLayer !== layer) {
@@ -1401,6 +1413,13 @@ export class BattleScene extends Phaser.Scene {
     };
     addBlurredSnapshot(this, reveal);
     this.time.delayedCall(400, () => reveal(null)); // snapshot unavailable or slow
+  }
+
+  // Extra block on the result screen under the HP tiles, centered on cx,
+  // `width` wide, top at y. None by default.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the base screen has nothing extra
+  drawResultExtra(_cx: number, _y: number, _width: number): { objects: Phaser.GameObjects.GameObject[]; height: number } | null {
+    return null;
   }
 
   // One fighter's HP on the result screen: name, the number, and a thin bar.

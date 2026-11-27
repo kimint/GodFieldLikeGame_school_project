@@ -5,6 +5,7 @@ import { AuthScreen } from "../components/AuthScreen.tsx";
 import { ClassSelect } from "../components/ClassSelect.tsx";
 import { DeckBuilder } from "../components/DeckBuilder.tsx";
 import { Gallery } from "../components/Gallery.tsx";
+import { Shop } from "../components/Shop.tsx";
 import { MatchHistory } from "../components/MatchHistory.tsx";
 import { ClassStats } from "../components/ClassStats.tsx";
 import { AccountSettings } from "../components/AccountSettings.tsx";
@@ -23,6 +24,8 @@ import { useIsAdmin } from "../hooks/useIsAdmin.ts";
 import { logOut, markTutorialSeen } from "../online/authApi.ts";
 import { listDecks, type SavedDeck } from "../online/decksApi.ts";
 import { fetchMatchHistory, recordCpuGame, type MatchHistoryData } from "../online/historyApi.ts";
+import { fetchEconomy } from "../online/shopApi.ts";
+import { lockedCardsIn, ownsClass, type Economy } from "../model/shop.ts";
 import type { FinishedGame } from "../scenes/BattleScene.ts";
 
 // The deck a player takes into a match: a saved deck, or the starter deck
@@ -36,6 +39,7 @@ interface DeckChoice {
 type Screen =
   | { name: "menu" }
   | { name: "gallery" }
+  | { name: "shop" }
   | { name: "record" }
   | { name: "account" }
   | { name: "tutorial" }
@@ -59,6 +63,9 @@ export function App(): ReactElement {
   const [selectedDeckIds, setSelectedDeckIds] = useState<Record<string, string | null>>({});
   const [history, setHistory] = useState<MatchHistoryData | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  // Gold and unlocks (null until loaded, and when the shop isn't set up on
+  // this database -- then every class and card stays open).
+  const [economy, setEconomy] = useState<Economy | null>(null);
 
   const accountId = auth.account?.id ?? null;
   // Admin-only tools (e.g. the reward debug bar) render when this is true.
@@ -83,6 +90,10 @@ export function App(): ReactElement {
   // so opening it again doesn't refetch -- only a finished game can change it.
   const reloadHistory = useCallback(async (): Promise<void> => {
     if (!accountId) return;
+    // Gold changes with every random match too.
+    fetchEconomy()
+      .then(setEconomy)
+      .catch((err: Error) => console.warn("Couldn't load Gold / unlocks:", err.message));
     try {
       setHistory(await fetchMatchHistory());
       setHistoryError(null);
@@ -110,6 +121,7 @@ export function App(): ReactElement {
     setSelectedDeckIds({});
     setHistory(null);
     setHistoryError(null);
+    setEconomy(null);
     setScreen({ name: "menu" });
     void reloadDecks();
     void reloadHistory();
@@ -168,12 +180,24 @@ export function App(): ReactElement {
   // The deck picked for a class, checked against the deck rules (the catalog
   // may have changed since it was saved). null = not playable, error shown.
   const deckFor = (classDef: ClassDef): DeckChoice | null => {
+    if (!ownsClass(economy, classDef.id)) {
+      showError("Class locked", `Unlock ${classDef.name} in the Shop first.`);
+      return null;
+    }
     const id = selectedDeckIds[classDef.id] ?? null;
     const saved = id ? decks.find((d) => d.id === id) : undefined;
     if (!saved) return { id: null, name: "Starter deck", list: null };
     const problem = validateDeckList(classDef, saved.cards);
     if (problem) {
       showError("Deck can't be used", `"${saved.name}": ${problem} Edit it in the deck builder or pick another deck.`);
+      return null;
+    }
+    const locked = lockedCardsIn(economy, saved.cards);
+    if (locked.length) {
+      showError(
+        "Deck can't be used",
+        `"${saved.name}" uses cards you haven't unlocked: ${locked.join(", ")}. Unlock them in the Shop, edit the deck, or pick the starter deck.`
+      );
       return null;
     }
     return { id: saved.id, name: saved.name, list: saved.cards };
@@ -255,6 +279,13 @@ export function App(): ReactElement {
     case "gallery":
       body = <Gallery onBack={toMenu} />;
       break;
+    case "shop":
+      body = economy ? (
+        <Shop classes={catalog.classes} economy={economy} onEconomyChange={setEconomy} onBack={toMenu} />
+      ) : (
+        <></>
+      );
+      break;
     case "tutorial":
       body = <PhaserTutorial onExit={toMenu} onAccountSettings={toAccount} />;
       break;
@@ -283,6 +314,7 @@ export function App(): ReactElement {
       body = (
         <DeckBuilder
           classDef={classDef}
+          economy={economy}
           decks={decks.filter((d) => d.classId === classDef.id)}
           initialDeckId={selectedDeckIds[classDef.id] ?? null}
           onDecksChanged={(deckId) => {
@@ -359,6 +391,9 @@ export function App(): ReactElement {
           classes={catalog.classes}
           initialClassId={lastClassId}
           account={auth.account}
+          economy={economy}
+          onEconomyChange={setEconomy}
+          onOpenShop={() => setScreen({ name: "shop" })}
           decks={decks}
           decksError={decksError}
           selectedDeckIds={selectedDeckIds}

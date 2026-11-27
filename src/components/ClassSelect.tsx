@@ -8,11 +8,18 @@ import { onlineAvailable } from "../online/supabaseClient.ts";
 import type { Account } from "../online/authApi.ts";
 import type { SavedDeck } from "../online/decksApi.ts";
 import { PlayerAvatar } from "./PlayerAvatar.tsx";
+import { CLASS_PRICES, REWARDS, formatGold, lockedCardsIn, ownsClass, winPreview, type Economy } from "../model/shop.ts";
+import { unlockClass } from "../online/shopApi.ts";
+import { GoldChip, PriceButton } from "./Shop.tsx";
+import { PurchaseDialog } from "./PurchaseDialog.tsx";
 
 export interface ClassSelectProps {
   classes: ClassDef[];
   initialClassId: string | null;
   account: Account | null; // null when online features are off (no Supabase config)
+  economy: Economy | null; // Gold and unlocks; null = not loaded / offline (everything open)
+  onEconomyChange: (economy: Economy) => void;
+  onOpenShop: () => void;
   decks: SavedDeck[]; // all of the player's saved decks
   decksError: string | null;
   selectedDeckIds: Record<string, string | null>; // per class; null/absent = starter deck
@@ -78,6 +85,9 @@ export function ClassSelect({
   classes,
   initialClassId,
   account,
+  economy,
+  onEconomyChange,
+  onOpenShop,
   decks,
   decksError,
   selectedDeckIds,
@@ -95,6 +105,7 @@ export function ClassSelect({
   onOpenTutorial,
 }: ClassSelectProps): ReactElement {
   const [selectedId, setSelectedId] = useState<string>(initialClassId ?? classes[0]?.id ?? "");
+  const [buying, setBuying] = useState<ClassDef | null>(null);
   const selected = classes.find((c) => c.id === selectedId) ?? classes[0];
   const classDecks = selected ? decks.filter((d) => d.classId === selected.id) : [];
   const chosenDeckId = selected ? (selectedDeckIds[selected.id] ?? null) : null;
@@ -105,6 +116,9 @@ export function ClassSelect({
   ) as Record<StatKey, number>;
   const ratio = (classDef: ClassDef, key: StatKey): number => classDef.baseStats[key] / statMax[key];
   // The two stats this class is relatively best at, shown as its "strengths".
+  const locked = selected ? !ownsClass(economy, selected.id) : false;
+  const price = selected ? (CLASS_PRICES[selected.id] ?? null) : null;
+  const capped = economy ? economy.dailyGold >= REWARDS.dailyCap : false;
   const strengths = selected
     ? [HP_STAT, ...STAT_ROWS].sort((a, b) => ratio(selected, b.key) - ratio(selected, a.key)).slice(0, 2)
     : [];
@@ -133,6 +147,12 @@ export function ClassSelect({
           <button type="button" className="lobby-nav-btn accent" onClick={onOpenTutorial}>
             Tutorial
           </button>
+          {economy ? (
+            <button type="button" className="lobby-nav-btn shop" onClick={onOpenShop}>
+              Shop
+            </button>
+          ) : null}
+          {economy ? <GoldChip economy={economy} /> : null}
           {account ? (
             <div className="lobby-account">
               <button
@@ -162,21 +182,27 @@ export function ClassSelect({
         <div className="lobby-rail" role="tablist" aria-label="Classes">
           {classes.map((classDef) => {
             const active = classDef.id === selected?.id;
+            const classLocked = !ownsClass(economy, classDef.id);
             return (
               <button
                 key={classDef.id}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className={`lobby-class${active ? " selected" : ""}`}
+                className={`lobby-class${active ? " selected" : ""}${classLocked ? " locked" : ""}`}
                 style={{ "--cls": accentOf(classDef) } as CSSProperties}
                 onClick={() => setSelectedId(classDef.id)}
               >
                 <Medallion classDef={classDef} size="sm" />
                 <span className="lobby-class-text">
                   <span className="lobby-class-name">{classDef.name}</span>
-                  <span className="lobby-class-sub">{classDef.synergyPool.map((s) => s.name).join(" · ")}</span>
+                  <span className="lobby-class-sub">
+                    {classLocked
+                      ? `Locked · ${formatGold(CLASS_PRICES[classDef.id] ?? 0)}`
+                      : classDef.synergyPool.map((s) => s.name).join(" · ")}
+                  </span>
                 </span>
+                {classLocked ? <span className="lobby-class-lock" aria-label="Locked" /> : null}
               </button>
             );
           })}
@@ -291,16 +317,20 @@ export function ClassSelect({
               >
                 Starter deck <span className="lobby-deck-count">{deckSize(starterDeckList(selected))}</span>
               </button>
-              {classDecks.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  className={`lobby-deck${chosenDeckId === d.id ? " selected" : ""}`}
-                  onClick={() => onSelectDeck(selected.id, d.id)}
-                >
-                  {d.name} <span className="lobby-deck-count">{deckSize(d.cards)}</span>
-                </button>
-              ))}
+              {classDecks.map((d) => {
+                const missing = lockedCardsIn(economy, d.cards);
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={`lobby-deck${chosenDeckId === d.id ? " selected" : ""}${missing.length ? " has-locked" : ""}`}
+                    title={missing.length ? `Locked cards: ${missing.join(", ")}` : undefined}
+                    onClick={() => onSelectDeck(selected.id, d.id)}
+                  >
+                    {d.name} <span className="lobby-deck-count">{deckSize(d.cards)}</span>
+                  </button>
+                );
+              })}
               {account ? (
                 <button type="button" className="lobby-deck edit" onClick={() => onEditDecks(selected.id)}>
                   Edit decks {classDecks.length}/{DECK_RULES.maxDecksPerClass}
@@ -310,6 +340,21 @@ export function ClassSelect({
             {decksError ? <p className="shell-note">Couldn&apos;t load your decks: {decksError}</p> : null}
           </div>
 
+          {locked ? (
+            <div className="lobby-play lobby-unlock">
+              <p className="lobby-unlock-text">
+                {selected.name} is locked. Win random matches to earn Gold, then unlock it here or in the Shop.
+              </p>
+              {price !== null ? (
+                <PriceButton
+                  label={`Unlock ${selected.name}`}
+                  price={price}
+                  gold={economy?.gold ?? 0}
+                  onClick={() => setBuying(selected)}
+                />
+              ) : null}
+            </div>
+          ) : (
           <div className="lobby-play">
             <div className="lobby-play-secondary">
               <button type="button" className="lobby-btn" onClick={() => onPlayCpu(selected.id)}>
@@ -339,9 +384,28 @@ export function ClassSelect({
               onClick={() => onRandomOnline(selected.id)}
             >
               Random match
+              {economy ? (
+                <span className={`lobby-btn-reward${capped ? " capped" : ""}`}>
+                  {capped ? "(Daily Gold Cap Reached - 0 G)" : `Win: +${formatGold(winPreview(economy))}`}
+                </span>
+              ) : null}
             </button>
           </div>
+          )}
         </footer>
+      ) : null}
+
+      {buying && economy ? (
+        <PurchaseDialog
+          title={`Unlock ${buying.name} for ${formatGold(CLASS_PRICES[buying.id] ?? 0)}?`}
+          price={CLASS_PRICES[buying.id] ?? 0}
+          gold={economy.gold}
+          onConfirm={async () => {
+            onEconomyChange(await unlockClass(buying.id));
+            setBuying(null);
+          }}
+          onClose={() => setBuying(null)}
+        />
       ) : null}
 
       {!onlineAvailable ? (

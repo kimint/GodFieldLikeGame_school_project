@@ -16,9 +16,11 @@ import {
 } from "../model/decks.ts";
 import { createDeck, deleteDeck, updateDeck, type SavedDeck } from "../online/decksApi.ts";
 import { FramedCard } from "./FramedCard.tsx";
+import { cardPrice, formatGold, lockedCardsIn, ownsCard, type Economy } from "../model/shop.ts";
 
 export interface DeckBuilderProps {
   classDef: ClassDef;
+  economy: Economy | null; // which cards are unlocked; null = all
   decks: SavedDeck[]; // this player's saved decks for classDef
   initialDeckId: string | null; // which one to open first (null = starter)
   onDecksChanged: (selectDeckId: string | null) => void; // after a save/delete: reload, and pick this deck
@@ -134,7 +136,7 @@ function CardTile({
 }
 
 /** Deck builder (React shell): the starter deck plus up to 3 custom decks for one class. */
-export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, confirm, onBack }: DeckBuilderProps): ReactElement {
+export function DeckBuilder({ classDef, economy, decks, initialDeckId, onDecksChanged, confirm, onBack }: DeckBuilderProps): ReactElement {
   const pool = useMemo(() => [...classCardPool(classDef)].sort(byCategoryCost), [classDef]);
   const starter = useMemo(() => starterDeckList(classDef), [classDef]);
 
@@ -160,7 +162,10 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
   const readOnly = draft.kind === "starter";
   const list: DeckListEntry[] = pool.filter((c) => (counts[c.id] ?? 0) > 0).map((c) => ({ cardId: c.id, copies: counts[c.id]! }));
   const total = deckSize(list);
-  const problem = validateDeckList(classDef, list);
+  const lockedInDeck = lockedCardsIn(economy, list);
+  const problem =
+    validateDeckList(classDef, list) ??
+    (lockedInDeck.length ? `Locked cards: ${lockedInDeck.join(", ")}. Unlock them in the Shop or take them out.` : null);
   const atLimit = decks.length >= DECK_RULES.maxDecksPerClass;
   const sizeOk = total >= DECK_RULES.minCards && total <= DECK_RULES.maxCards;
 
@@ -208,6 +213,7 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
   // Room for one more copy: under its copy limit, and its rarity points fit.
   const canAdd = (card: CatalogCardEntry | null | undefined): boolean =>
     Boolean(card) &&
+    ownsCard(economy, card!) &&
     (counts[card!.id] ?? 0) < maxCopiesOf(card) &&
     points + rarityPointsOf(card) <= DECK_RULES.maxRarityPoints;
 
@@ -493,7 +499,9 @@ export function DeckBuilder({ classDef, decks, initialDeckId, onDecksChanged, co
                 <CardTile
                   key={card.id}
                   card={card}
-                  badge={`${copies}/${maxCopiesOf(card)}`}
+                  badge={
+                    ownsCard(economy, card) ? `${copies}/${maxCopiesOf(card)}` : `🔒 ${formatGold(cardPrice(card) ?? 0)}`
+                  }
                   dim={!canAdd(card)}
                   selected={card.id === selectedId}
                   draggable={!readOnly && canAdd(card)}

@@ -14,6 +14,7 @@ import { buildDeckFromList, validateDeckList, type DeckListEntry } from "../src/
 import { serializeFighter } from "../src/model/serialize.ts";
 import type { ClassDef } from "../src/model/classes.ts";
 import type { RandomMatchView, RematchEndReason } from "../src/online/randomMatchView.ts";
+import { lockedCardsIn, ownsClass, type Economy, type MatchReward } from "../src/model/shop.ts";
 import { admin } from "./supabase.ts";
 
 interface JoinOptions {
@@ -32,6 +33,7 @@ interface Seat {
   pick: Action | null;
   rematch: boolean; // pressed Rematch on the result screen
   reconnectBy: number | null; // while dropped: when the seat is given up (ms)
+  reward: MatchReward | null; // Gold paid for the last random-match battle
 }
 
 // No ambiguous characters (0/O, 1/I) so a code read out loud still works.
@@ -62,6 +64,7 @@ export class BattleRoom extends Room {
   private game = 0; // counts battles in this room; goes up on each rematch
   private rematchEndsAt: number | null = null;
   private rematchTimer: Delayed | null = null;
+  private forfeitBy: Seat | null = null; // who left mid-battle, if anyone
 
   // Runs before onJoin: check the Supabase login and the chosen deck.
   async onAuth(_client: Client, options: JoinOptions) {
@@ -74,6 +77,8 @@ export class BattleRoom extends Room {
     if (this.seats.some((s) => s.userId === userId)) throw new Error("You're already in this match");
 
     const classDef = findClassById(String(options.classId));
+    const owned = await unlocksOf(userId);
+    if (!ownsClass(owned, classDef.id)) throw new Error(`Unlock ${classDef.name} in the shop first`);
     let deckList: DeckListEntry[] | null = null;
     if (options.deckId) {
       const { data: deck } = await admin
@@ -85,6 +90,8 @@ export class BattleRoom extends Room {
       if (!deck || deck.class_id !== classDef.id) throw new Error("Deck not found");
       const problem = validateDeckList(classDef, deck.cards);
       if (problem) throw new Error(`That deck can't be used: ${problem}`);
+      const locked = lockedCardsIn(owned, deck.cards as DeckListEntry[]);
+      if (locked.length) throw new Error(`That deck uses cards you haven't unlocked: ${locked.join(", ")}`);
       deckList = deck.cards as DeckListEntry[];
     }
     return { userId, username, classDef, deckList };
@@ -95,7 +102,7 @@ export class BattleRoom extends Room {
     _options: JoinOptions,
     auth: { userId: string; username: string; classDef: ClassDef; deckList: DeckListEntry[] | null }
   ) {
-    this.seats.push({ client, ...auth, pick: null, rematch: false, reconnectBy: null });
+    this.seats.push({ client, ...auth, pick: null, rematch: false, reconnectBy: null, reward: null });
     if (this.seats.length < 2) {
       client.send("waiting");
       return;
@@ -118,9 +125,11 @@ export class BattleRoom extends Room {
     });
     this.game++;
     this.recorded = false;
+    this.forfeitBy = null;
     for (const seat of this.seats) {
       seat.pick = null;
       seat.rematch = false;
+      seat.reward = null;
     }
     this.stopRematchTimer();
     this.startTurnTimer();
@@ -240,7 +249,7 @@ export class BattleRoom extends Room {
   }
 
   // Left for good (pressed Leave, or didn't come back in time) = forfeit.
-  onLeave(client: Client) {
+  async onLeave(client: Client) {
     const seat = this.seatOf(client);
     if (seat) seat.reconnectBy = null;
     // Left before an opponent arrived: free the seat for the next player.
@@ -261,8 +270,10 @@ export class BattleRoom extends Room {
     if (other) {
       this.battle.winner = this.fighterOf(other);
       this.battle.log.unshift("Opponent left the match.");
-      void this.recordResult();
+      this.forfeitBy = seat ?? null;
       this.sendViews();
+      // The room closes next: wait for the Gold so the winner still sees it.
+      await this.recordResult();
     }
     this.disconnect();
   }
@@ -270,11 +281,14 @@ export class BattleRoom extends Room {
   // Both players' match_history rows, once per battle -- the table's trigger
   // (supabase/migrations/*_match_history.sql) updates pvp_records and keeps
   // only the last 5. A failed write only costs the record, not the match.
+  // Then each player's Gold (grant_match_reward in
+  // supabase/migrations/*_rewards_and_unlocks.sql), sent to them in the view.
   private async recordResult() {
     const battle = this.battle;
     // Only random matches count; private rooms are friendly games.
     if (!battle || this.isPrivate || this.recorded || this.seats.length < 2) return;
     this.recorded = true;
+    const rewards = this.grantRewards(battle);
     const rows = this.seats.map((seat) => {
       const me = this.fighterOf(seat);
       const other = this.otherSeat(seat)!;
@@ -289,6 +303,31 @@ export class BattleRoom extends Room {
     });
     const { error } = await admin.from("match_history").insert(rows);
     if (error) console.error("Couldn't save match history:", error.message);
+    await rewards;
+  }
+
+  // Rounds actually played: a forfeit ends the battle in the middle of a round.
+  private turnsPlayed(battle: Battle): number {
+    return this.forfeitBy ? battle.round - 1 : battle.round;
+  }
+
+  private async grantRewards(battle: Battle): Promise<void> {
+    const game = this.game;
+    const turns = this.turnsPlayed(battle);
+    await Promise.all(
+      this.seats.map(async (seat) => {
+        const me = this.fighterOf(seat);
+        const { data, error } = await admin.rpc("grant_match_reward", {
+          p_user_id: seat.userId,
+          p_result: battle.draw ? "draw" : battle.winner === me ? "win" : "loss",
+          p_turns: turns,
+          p_surrendered: this.forfeitBy === seat,
+        });
+        if (error) console.error("Couldn't pay the match reward:", error.message);
+        else seat.reward = data as MatchReward;
+      })
+    );
+    if (this.game === game && this.battle === battle) this.sendViews();
   }
 
   private seatOf(client: Client) {
@@ -328,7 +367,29 @@ export class BattleRoom extends Room {
         myRematch: seat.rematch,
         opponentRematch: other?.rematch ?? false,
         result: battle.draw ? "draw" : battle.winner === me ? "win" : battle.winner ? "lose" : null,
+        rewards: !this.isPrivate,
+        reward: seat.reward,
       } satisfies RandomMatchView);
     }
   }
+}
+
+// What a player owns (unlocks_for in supabase/migrations/*_rewards_and_unlocks.sql),
+// shaped as an Economy for ownsClass / lockedCardsIn. If the shop isn't set up
+// on this database yet, everyone may play everything.
+async function unlocksOf(userId: string): Promise<Economy | null> {
+  const { data, error } = await admin.rpc("unlocks_for", { p_user_id: userId });
+  if (error) {
+    console.warn("Couldn't check unlocks (is the rewards_and_unlocks migration applied?):", error.message);
+    return null;
+  }
+  const d = data as { admin?: boolean; classes?: string[]; cards?: string[] };
+  return {
+    admin: d.admin === true,
+    gold: 0,
+    dailyGold: 0,
+    firstWinAvailable: false,
+    classes: d.classes ?? [],
+    cards: d.cards ?? [],
+  };
 }

@@ -2,6 +2,7 @@
 // every change, from that player's point of view. Types only, so both the
 // server and the browser can import it.
 import type { SerializedFighter } from "../model/serialize.ts";
+import type { MatchReward } from "../model/shop.ts";
 
 export interface RandomMatchView {
   round: number;
@@ -18,6 +19,8 @@ export interface RandomMatchView {
   rematchMsLeft: number | null; // set while the post-battle rematch window is open
   myRematch: boolean; // I pressed Rematch
   opponentRematch: boolean; // the opponent pressed Rematch
+  rewards: boolean; // this match pays Gold (random matches; not private rooms)
+  reward: MatchReward | null; // my Gold for this battle, once the server has paid it
 }
 
 // Sent as "rematchEnded" just before the room closes after a battle.

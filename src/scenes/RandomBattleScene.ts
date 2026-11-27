@@ -3,7 +3,9 @@
 // resolves the round once both players have picked.
 
 import { BattleScene, type BattleSceneData, type ResultAction } from "./BattleScene.ts";
-import { COLORS, type Button } from "./theme.ts";
+import { COLORS, FONT_DISPLAY, FONT_NUM, FONT_UI, GOLD, GOLD_CSS, type Button } from "./theme.ts";
+import { RESULT_TEXT } from "./resultScreen.ts";
+import { REWARDS, formatGold, type MatchReward } from "../model/shop.ts";
 import { isBattleOver, type Action, type Fighter } from "../model/engine.ts";
 import { deserializeFighter } from "../model/serialize.ts";
 import type { BattleView } from "../online/matchApi.ts";
@@ -46,6 +48,9 @@ export class RandomBattleScene extends BattleScene {
   rematchSent = false;
   exitAt: number | null = null;
   leaving = false;
+  // The Gold block on the result screen, filled in once the server has paid.
+  rewardBox: { amount: Phaser.GameObjects.Text; detail: Phaser.GameObjects.Text; balance: Phaser.GameObjects.Text; today: Phaser.GameObjects.Text } | null = null;
+  rewardShown = false;
 
   constructor() {
     super("RandomBattleScene");
@@ -62,6 +67,8 @@ export class RandomBattleScene extends BattleScene {
     this.rematchSent = false;
     this.exitAt = null;
     this.leaving = false;
+    this.rewardBox = null;
+    this.rewardShown = false;
 
     const unsubscribe = [
       match.onView((view) => this.applyView(view)),
@@ -139,6 +146,82 @@ export class RandomBattleScene extends BattleScene {
     this.turnDeadline = this.match.turnDeadline;
     if (this.autoEndTurnIfTimeUp()) return;
     this.setStatus(this.statusMessage());
+  }
+
+  // --- Gold reward ------------------------------------------------------------
+
+  // Random matches: what this battle paid, under the HP tiles. The server pays
+  // a moment after the battle ends, so it may show "Calculating…" first.
+  override drawResultExtra(cx: number, y: number, width: number): { objects: Phaser.GameObjects.GameObject[]; height: number } | null {
+    if (!this.match.latest?.rewards) return null;
+    const h = 112;
+    const box = this.add.container(cx - width / 2, y);
+    const g = this.add.graphics();
+    g.fillStyle(0x1a1408, 0.7);
+    g.fillRoundedRect(0, 0, width, h, 12);
+    g.lineStyle(1, GOLD, 0.35);
+    g.strokeRoundedRect(0.5, 0.5, width - 1, h - 1, 12);
+    const label = this.add
+      .text(20, 14, "GOLD EARNED", { fontFamily: FONT_DISPLAY, fontSize: "15px", fontStyle: "700", color: RESULT_TEXT.label, letterSpacing: 2 })
+      .setOrigin(0, 0);
+    const amount = this.add
+      .text(20, 34, "…", { fontFamily: FONT_NUM, fontSize: "34px", fontStyle: "700", color: GOLD_CSS })
+      .setOrigin(0, 0);
+    amount.setShadow(0, 0, "#e2c588", 6, false, true);
+    const detail = this.add
+      .text(20, h - 14, "Calculating your reward…", {
+        fontFamily: FONT_UI,
+        fontSize: "15px",
+        fontStyle: "600",
+        color: RESULT_TEXT.soft,
+        wordWrap: { width: width - 40 },
+      })
+      .setOrigin(0, 1);
+    const balanceLabel = this.add
+      .text(width - 20, 14, "BALANCE", { fontFamily: FONT_DISPLAY, fontSize: "15px", fontStyle: "700", color: RESULT_TEXT.label, letterSpacing: 2 })
+      .setOrigin(1, 0);
+    const balance = this.add
+      .text(width - 20, 36, "", { fontFamily: FONT_NUM, fontSize: "24px", fontStyle: "700", color: RESULT_TEXT.ivory })
+      .setOrigin(1, 0);
+    const today = this.add
+      .text(width - 20, 62, "", { fontFamily: FONT_NUM, fontSize: "14px", fontStyle: "600", color: RESULT_TEXT.soft })
+      .setOrigin(1, 0);
+    box.add([g, label, amount, detail, balanceLabel, balance, today]);
+    this.rewardBox = { amount, detail, balance, today };
+    this.rewardShown = false;
+    this.showReward();
+    return { objects: [box], height: h };
+  }
+
+  // Fill the Gold block, rolling the numbers up from the old balance.
+  private showReward(): void {
+    const reward = this.match.latest?.reward;
+    const box = this.rewardBox;
+    if (!reward || !box || this.rewardShown || !box.amount.active) return;
+    this.rewardShown = true;
+    box.detail.setText(rewardDetail(reward));
+    if (reward.blocked.length) box.detail.setColor("#ec8a7c");
+    else if (reward.capCut > 0) box.detail.setColor("#e9c27a");
+    box.today.setText(`Today ${reward.dailyGold.toLocaleString("en-US")} / ${formatGold(REWARDS.dailyCap)}`);
+    const before = reward.gold - reward.granted;
+    const paint = (v: number): void => {
+      box.amount.setText(`+${formatGold(v * reward.granted)}`);
+      box.balance.setText(formatGold(before + v * reward.granted));
+    };
+    paint(0);
+    if (reward.granted === 0) {
+      box.amount.setColor("#9a958a");
+      return;
+    }
+    this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      delay: 650, // after the panel has faded in
+      duration: 1200,
+      ease: "Cubic.easeOut",
+      onUpdate: (tween) => paint(tween.getValue() ?? 1),
+      onComplete: () => paint(1),
+    });
   }
 
   // --- rematch --------------------------------------------------------------
@@ -275,7 +358,20 @@ export class RandomBattleScene extends BattleScene {
       (this.battle.round > previous.round || (isBattleOver(this.battle) && !isBattleOver(previous)));
     if (justResolved) this.presentRound(before);
     else this.render();
+    this.showReward(); // the Gold can arrive after the result screen is up
   }
+}
+
+// The line under the Gold earned: where it came from, or why there's none.
+function rewardDetail(r: MatchReward): string {
+  if (r.blocked.length) {
+    const why = r.blocked.includes("early_surrender") ? "Early surrender detected." : `Only ${r.turns} turns played.`;
+    return `No reward: at least ${REWARDS.minTurns} turns are required. ${why}`;
+  }
+  const parts = [`${r.base === REWARDS.win ? "Win" : "Match"} +${r.base}`];
+  if (r.firstWinBonus) parts.push(`First win of the day +${r.firstWinBonus}`);
+  if (r.capCut) parts.push(r.granted === 0 ? "Daily Gold cap reached" : `Daily cap −${r.capCut}`);
+  return parts.join("  ·  ");
 }
 
 // createButton() puts the label text second in its container.

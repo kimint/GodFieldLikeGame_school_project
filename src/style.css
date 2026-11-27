@@ -4159,3 +4159,397 @@ body {
 .lobby-btn { font-weight: 600; letter-spacing: 0.02em; }
 .lobby-btn.primary { font-family: var(--lb-display); font-weight: 700; font-size: 21px; letter-spacing: 0.16em; }
 .lobby-nav-btn, .lobby-deck { font-weight: 500; }
+
+/* --- Gold and the Unlock Shop ------------------------------------------------
+   Gold chip in the lobby top bar, locked classes, the Random match reward
+   line, the Shop screen (built on the gallery screen) and the purchase
+   dialog. Same gold / glass look as the lobby. */
+
+.gold-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(226, 197, 136, 0.45);
+  background: linear-gradient(to bottom, rgba(70, 54, 26, 0.55), rgba(24, 19, 11, 0.7));
+  box-shadow: 0 0 18px rgba(226, 185, 100, 0.15);
+  white-space: nowrap;
+}
+
+.gold-chip-coin {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff2c4, #e2b85c 45%, #9a7230 100%);
+  box-shadow: inset 0 0 0 2px rgba(120, 86, 30, 0.6), 0 0 10px rgba(226, 185, 100, 0.45);
+}
+
+.gold-chip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gold-chip-value {
+  font-family: "Outfit", "Inter", sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+  color: #f6dd9c;
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-chip-cap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Outfit", "Inter", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #d9cfb8;
+  font-variant-numeric: tabular-nums;
+}
+
+.gold-chip-bar {
+  position: relative;
+  width: 54px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.gold-chip-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+  background: linear-gradient(to right, #c99a45, #f6dd9c);
+  transition: width 0.6s ease;
+}
+
+.gold-chip.capped .gold-chip-bar span {
+  background: #d0675a;
+}
+
+.gold-chip.capped .gold-chip-cap {
+  color: #f0a597;
+}
+
+.lobby-nav-btn.shop {
+  border-color: var(--lb-gold);
+  color: #f6dd9c;
+  background: rgba(226, 197, 136, 0.1);
+}
+
+/* Locked class in the lobby rail. */
+.lobby-class.locked .lobby-medallion {
+  filter: grayscale(0.85) brightness(0.7);
+}
+
+.lobby-class.locked .lobby-class-sub {
+  color: #e2c588;
+}
+
+.lobby-class-lock {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  background: no-repeat center / contain
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e2c588' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='11' width='16' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E");
+}
+
+/* Dock for a locked class: the reason and the Unlock button. */
+.lobby-unlock {
+  justify-content: flex-end;
+}
+
+.lobby-unlock-text {
+  max-width: 420px;
+  margin: 0;
+  color: var(--lb-soft);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+/* "Win: +100 G" under RANDOM MATCH. */
+.lobby-btn.primary:has(.lobby-btn-reward) {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.1;
+}
+
+.lobby-btn-reward {
+  font-family: var(--lb-num);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: #f6dd9c;
+}
+
+.lobby-btn-reward.capped {
+  color: #f0a597;
+}
+
+.lobby-deck.has-locked {
+  border-style: dashed;
+  color: #f0a597;
+}
+
+/* --- Shop screen --- */
+.shop-screen {
+  --lb-gold: #e2c588;
+  --lb-gold-dim: rgba(226, 197, 136, 0.4);
+  --lb-line: rgba(226, 197, 136, 0.24);
+  --lb-soft: #d9dbe2;
+  --lb-display: "Cinzel", "Cormorant Garamond", Georgia, serif;
+  --lb-num: "Outfit", "Inter", "Helvetica Neue", Arial, sans-serif;
+}
+
+.shop-header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.shop-note {
+  position: relative;
+  margin: 0 0 16px;
+  color: #e6dcc6;
+  font-size: 16px;
+}
+
+.shop-class-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.shop-class {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 26px 20px 22px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(to bottom, rgba(30, 27, 23, 0.78), rgba(12, 12, 14, 0.86));
+  backdrop-filter: blur(8px);
+  text-align: center;
+}
+
+.shop-class.owned {
+  border-color: rgba(226, 197, 136, 0.45);
+}
+
+.shop-class:not(.owned) .shop-class-icon {
+  filter: grayscale(0.85) brightness(0.7);
+}
+
+.shop-class-name {
+  margin: 6px 0 0;
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #f4f1ea;
+}
+
+.shop-class-sub {
+  margin: 0;
+  color: #d9d2c2;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.shop-class-action {
+  margin-top: auto;
+  padding-top: 12px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.shop-owned {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  color: #8fe0b0;
+  font-family: "Outfit", "Inter", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.shop-owned.muted {
+  color: #d9d2c2;
+  font-weight: 600;
+  font-size: 15px;
+  text-align: center;
+}
+
+.shop-price {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.shop-price .shop-price-btn {
+  width: 100%;
+  height: 52px;
+  padding: 0 18px;
+  font-size: 17px;
+  letter-spacing: 0.08em;
+}
+
+.shop-price.small .shop-price-btn {
+  height: 42px;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+}
+
+.shop-price-need {
+  color: #f0a597;
+  font-family: "Outfit", "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.shop-pack {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 20px 24px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 197, 136, 0.4);
+  background: linear-gradient(to right, rgba(80, 60, 25, 0.5), rgba(14, 13, 12, 0.82));
+}
+
+.shop-pack-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.shop-pack-text h2 {
+  margin: 0 0 4px;
+  font-family: "Cinzel", Georgia, serif;
+  font-size: 22px;
+  color: #f6dd9c;
+}
+
+.shop-pack-text p {
+  margin: 0;
+  color: #e6dcc6;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.shop-pack .shop-price {
+  width: 240px;
+}
+
+.shop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shop-card.locked .framed-card {
+  filter: saturate(0.55) brightness(0.8);
+}
+
+/* --- Purchase dialog --- */
+.shop-dialog-sum {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 16px;
+  margin: 16px 0 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  font-size: 16px;
+}
+
+.shop-dialog-sum dt {
+  color: #d9d2c2;
+}
+
+.shop-dialog-sum dd {
+  margin: 0;
+  text-align: right;
+  font-family: "Outfit", "Inter", sans-serif;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.shop-dialog-sum dd.minus {
+  color: #f0a597;
+}
+
+.shop-dialog-sum .total {
+  padding-top: 6px;
+  border-top: 1px solid rgba(226, 197, 136, 0.25);
+  color: #f6dd9c;
+}
+
+.shop-dialog-error {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(208, 103, 90, 0.5);
+  background: rgba(208, 103, 90, 0.12);
+  color: #f6c2b8;
+  font-size: 15px;
+}
+
+.shop-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: shop-spin 0.7s linear infinite;
+}
+
+@keyframes shop-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-spinner {
+    animation-duration: 2s;
+  }
+}
+
+.shop-pack-result .shop-pack-card {
+  width: 220px;
+  margin: 16px auto 4px;
+}
+
+.lobby-unlock .shop-price {
+  width: auto;
+  align-items: flex-end;
+}
+
+.lobby-unlock .shop-price .shop-price-btn {
+  width: auto;
+  height: 62px;
+  padding: 0 32px;
+}
