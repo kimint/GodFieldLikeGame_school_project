@@ -33,6 +33,7 @@ export interface ClassSelectProps {
   onRandomOnline: (classId: string) => void;
   onOpenGallery: () => void;
   onOpenRecord: () => void;
+  onOpenLeaderboard: () => void;
   onOpenClassStats: () => void;
   onOpenTutorial: () => void;
 }
@@ -101,6 +102,7 @@ export function ClassSelect({
   onRandomOnline,
   onOpenGallery,
   onOpenRecord,
+  onOpenLeaderboard,
   onOpenClassStats,
   onOpenTutorial,
 }: ClassSelectProps): ReactElement {
@@ -134,6 +136,11 @@ export function ClassSelect({
           {account ? (
             <button type="button" className="lobby-nav-btn" onClick={onOpenRecord}>
               My record
+            </button>
+          ) : null}
+          {account ? (
+            <button type="button" className="lobby-nav-btn" onClick={onOpenLeaderboard}>
+              Leaderboard
             </button>
           ) : null}
           {onlineAvailable ? (

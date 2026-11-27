@@ -8,6 +8,7 @@ import { Gallery } from "../components/Gallery.tsx";
 import { Shop } from "../components/Shop.tsx";
 import { MatchHistory } from "../components/MatchHistory.tsx";
 import { ClassStats } from "../components/ClassStats.tsx";
+import { Leaderboard } from "../components/Leaderboard.tsx";
 import { AccountSettings } from "../components/AccountSettings.tsx";
 import { PhaserTutorial } from "../components/PhaserTutorial.tsx";
 import { Lobby } from "../components/Lobby.tsx";
@@ -41,6 +42,7 @@ type Screen =
   | { name: "gallery" }
   | { name: "shop" }
   | { name: "record" }
+  | { name: "leaderboard" }
   | { name: "account" }
   | { name: "tutorial" }
   | { name: "decks"; classId: string }
@@ -68,8 +70,7 @@ export function App(): ReactElement {
   const [economy, setEconomy] = useState<Economy | null>(null);
 
   const accountId = auth.account?.id ?? null;
-  // Admin-only tools (e.g. the reward debug bar) render when this is true.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used once the debug bar lands
+  // Admin-only tools (e.g. the leaderboard's "Simulate +1 win") render when this is true.
   const isAdmin = useIsAdmin(accountId);
   const needsTutorialPrompt = auth.account?.needsTutorialPrompt ?? false;
   // Accounts already asked this session, so the prompt doesn't come back while
@@ -302,6 +303,9 @@ export function App(): ReactElement {
         />
       );
       break;
+    case "leaderboard":
+      body = accountId ? <Leaderboard accountId={accountId} isAdmin={isAdmin} onBack={toMenu} /> : <></>;
+      break;
     case "account":
       body = auth.account ? (
         <AccountSettings account={auth.account} history={history} onBack={toMenu} onLogout={logOutNow} />
@@ -414,6 +418,7 @@ export function App(): ReactElement {
           }
           onOpenGallery={() => setScreen({ name: "gallery" })}
           onOpenRecord={() => setScreen({ name: "record" })}
+          onOpenLeaderboard={() => setScreen({ name: "leaderboard" })}
           onOpenClassStats={() => setScreen({ name: "class-stats" })}
           onOpenTutorial={() => setScreen({ name: "tutorial" })}
         />
