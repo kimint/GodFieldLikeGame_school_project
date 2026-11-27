@@ -159,24 +159,28 @@ export function ClassSelect({
               Shop
             </button>
           ) : null}
-          {economy ? <GoldChip economy={economy} /> : null}
-          {account ? (
-            <div className="lobby-account">
-              <button
-                type="button"
-                className="lobby-account-btn"
-                onClick={onOpenAccount}
-                title={`${account.email} · Account settings`}
-              >
-                <PlayerAvatar url={account.avatarUrl} className="sm" />
-                <span className="lobby-account-name">{account.username}</span>
-              </button>
-              <button type="button" className="lobby-logout" onClick={onLogout}>
-                Log out
-              </button>
-            </div>
-          ) : null}
         </nav>
+        {economy || account ? (
+          <div className="lobby-topbar-right">
+            {economy ? <GoldChip economy={economy} /> : null}
+            {account ? (
+              <div className="lobby-account">
+                <button
+                  type="button"
+                  className="lobby-account-btn"
+                  onClick={onOpenAccount}
+                  title={`${account.email} · Account settings`}
+                >
+                  <PlayerAvatar url={account.avatarUrl} className="sm" />
+                  <span className="lobby-account-name">{account.username}</span>
+                </button>
+                <button type="button" className="lobby-logout" onClick={onLogout}>
+                  Log out
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       <div className="lobby-heading">

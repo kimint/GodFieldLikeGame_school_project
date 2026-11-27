@@ -3326,53 +3326,82 @@ body {
   font-family: inherit;
 }
 
-/* Top bar */
+/* Top bar: one row -- brand | nav pills | Gold + account. Nothing wraps;
+   when the pills don't fit they scroll sideways instead. */
 .lobby-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 4px 4px 16px;
+  gap: 14px;
+  flex-wrap: nowrap;
+  padding: 4px 4px 14px;
   border-bottom: 1px solid var(--lb-line);
 }
 
 .lobby-brand {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .lobby-brand-mark {
-  width: 54px;
-  height: 54px;
+  width: 40px;
+  height: 40px;
   filter: drop-shadow(0 0 6px rgba(230, 190, 110, 0.4));
 }
 
 .lobby-brand-name {
   font-weight: 400;
-  font-size: 30px;
-  letter-spacing: 0.3em;
+  font-size: 21px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--lb-gold);
 }
 
 .lobby-nav {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.lobby-nav::-webkit-scrollbar {
+  display: none;
+}
+
+/* With Gold / account after it, the pill strip takes the middle and centers
+   the pills when they fit; auto margins (not justify-content) so the first
+   pill is still reachable once the row scrolls. Alone (Account settings,
+   offline) it stays right-aligned. */
+.lobby-nav:not(:last-child) > :first-child {
+  margin-left: auto;
+}
+
+.lobby-nav:not(:last-child) > :last-child {
+  margin-right: auto;
+}
+
+.lobby-nav:last-child {
+  justify-content: flex-end;
 }
 
 .lobby-nav-btn {
-  padding: 11px 20px;
+  flex: none;
+  padding: 7px 12px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.05);
   color: var(--lb-soft);
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
   cursor: pointer;
   transition: border-color 0.2s ease, color 0.2s ease;
 }
@@ -3387,13 +3416,47 @@ body {
   color: var(--lb-gold);
 }
 
+.lobby-topbar-right {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+
+/* A slightly slimmer Gold chip and account in the top bar (the Shop keeps
+   the full-size chip). */
+.lobby-topbar-right .gold-chip {
+  gap: 8px;
+  padding: 5px 12px 5px 6px;
+}
+
+.lobby-topbar-right .gold-chip-bar {
+  width: 40px;
+}
+
+.lobby-topbar-right .gold-chip-value {
+  font-size: 18px;
+}
+
+.lobby-topbar .lobby-account-btn {
+  padding-right: 10px;
+}
+
+.lobby-topbar .lobby-account-name {
+  font-size: 16px;
+}
+
+.lobby-topbar .lobby-logout {
+  font-size: 14px;
+}
+
 .lobby-account {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-left: 6px;
-  padding-left: 16px;
+  gap: 2px;
+  padding-left: 10px;
   border-left: 1px solid var(--lb-line);
+  white-space: nowrap;
 }
 
 /* The username (with picture) opens Account settings. */
@@ -3435,6 +3498,7 @@ body {
   padding: 4px 2px;
   color: var(--lb-muted);
   font-size: 15px;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -4041,6 +4105,71 @@ body {
 .lobby-logout:focus-visible {
   outline: 2px solid var(--lb-gold);
   outline-offset: 3px;
+}
+
+/* Below ~1250px the pills no longer all fit: they scroll sideways, fading
+   at the edges, so Gold and the account stay on the same row. */
+@media (max-width: 1249px) {
+  .lobby-nav:not(:last-child) {
+    padding: 2px 0;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+  }
+
+  .lobby-nav:not(:last-child) > :first-child {
+    margin-left: 14px;
+  }
+
+  .lobby-nav:not(:last-child) > :last-child {
+    margin-right: 14px;
+  }
+}
+
+/* Below 1024px the emblem stands alone to leave the pills more room. */
+@media (max-width: 1023px) {
+  .lobby-topbar:has(> .lobby-topbar-right) .lobby-brand-name {
+    display: none;
+  }
+}
+
+/* Phones: brand + Gold + account on the first row, the pill strip under it. */
+@media (max-width: 640px) {
+  .lobby-topbar {
+    flex-wrap: wrap;
+    row-gap: 12px;
+  }
+
+  .lobby-nav:not(:last-child) {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .lobby-topbar-right {
+    gap: 10px;
+  }
+
+  .lobby-account {
+    padding-left: 10px;
+  }
+
+  .lobby-topbar-right .gold-chip-cap {
+    display: none;
+  }
+
+  .lobby-nav:not(:last-child) > :first-child {
+    margin-left: 0;
+  }
+}
+
+/* Small phones: the avatar alone opens Account settings. */
+@media (max-width: 480px) {
+  .lobby-account-name {
+    display: none;
+  }
+
+  .lobby-topbar .lobby-account-btn {
+    padding-right: 3px;
+  }
 }
 
 @media (max-width: 1100px) {
