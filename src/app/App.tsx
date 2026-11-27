@@ -61,10 +61,9 @@ export function App(): ReactElement {
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   const accountId = auth.account?.id ?? null;
+  // Admin-only tools (e.g. the reward debug bar) render when this is true.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used once the debug bar lands
   const isAdmin = useIsAdmin(accountId);
-  useEffect(() => {
-    if (accountId) console.log("[admin] is_admin =", isAdmin);
-  }, [accountId, isAdmin]);
   const needsTutorialPrompt = auth.account?.needsTutorialPrompt ?? false;
   // Accounts already asked this session, so the prompt doesn't come back while
   // the "tutorial seen" flag is still saving.
