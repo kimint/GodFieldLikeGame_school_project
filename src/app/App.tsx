@@ -19,6 +19,7 @@ import { findClassById } from "../model/catalog.ts";
 import { validateDeckList, type DeckListEntry } from "../model/decks.ts";
 import type { ClassDef } from "../model/classes.ts";
 import { onlineAvailable } from "../online/supabaseClient.ts";
+import { useIsAdmin } from "../hooks/useIsAdmin.ts";
 import { logOut, markTutorialSeen } from "../online/authApi.ts";
 import { listDecks, type SavedDeck } from "../online/decksApi.ts";
 import { fetchMatchHistory, recordCpuGame, type MatchHistoryData } from "../online/historyApi.ts";
@@ -60,6 +61,10 @@ export function App(): ReactElement {
   const [historyError, setHistoryError] = useState<string | null>(null);
 
   const accountId = auth.account?.id ?? null;
+  const isAdmin = useIsAdmin(accountId);
+  useEffect(() => {
+    if (accountId) console.log("[admin] is_admin =", isAdmin);
+  }, [accountId, isAdmin]);
   const needsTutorialPrompt = auth.account?.needsTutorialPrompt ?? false;
   // Accounts already asked this session, so the prompt doesn't come back while
   // the "tutorial seen" flag is still saving.
